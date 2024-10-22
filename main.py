@@ -115,6 +115,7 @@ atualizar_abas_com_colunas_personalizadas(df, 'Tipo do requerimento', client, 'R
 
 #------------------------------------------------#
 
+
 from oauth2client.service_account import ServiceAccountCredentials
 import gspread
 import pandas as pd
@@ -179,11 +180,10 @@ app = Dash(__name__)
 app.layout = html.Div(children=[
     html.H1(children='Dashboard de Relatórios PPG Geografia'),
 
-    # Layout da parte superior
+    # Layout da parte superior com gráfico de linha, gráfico de pizza e tabela
     html.Div([
-        # Gráfico na parte superior esquerda
+        # Gráfico de linha na parte superior esquerda
         html.Div([
-            # Texto e Dropdown ao lado (alinhados horizontalmente)
             html.Label('Tipo de Lançamento:', style={'font-size': '12px', 'display': 'inline-block', 'marginRight': '15px'}),
             dcc.Dropdown(
                 id='dropdown-tipo-lancamento',
@@ -191,12 +191,17 @@ app.layout = html.Div(children=[
                          [{'label': tipo, 'value': tipo} for tipo in df_financeiro['[Recursos financeiros]   Tipo de lançamento\n'].unique()],
                 value='todos',  # Valor inicial: Todos os Tipos
                 clearable=False,
-                style={'width': 'auto', 'display': 'inline-block', 'min-width': '400px', 'max-width': '600px'}  # Tamanho flexível
+                style={'width': 'auto', 'display': 'inline-block', 'min-width': '400px', 'max-width': '600px'}
             ),
-            dcc.Graph(id='graph-valores-tempo', config={'displayModeBar': False}, style={'height': '300px'})  # Reduzir altura do gráfico
-        ], style={'width': '50%', 'display': 'inline-block'}),
+            dcc.Graph(id='graph-valores-tempo', config={'displayModeBar': False}, style={'height': '300px'})
+        ], style={'width': '33%', 'display': 'inline-block'}),  # Tamanho ajustado para ficar ao lado do gráfico de pizza e da tabela
 
-        # Tabela de resumo na parte superior direita
+        # Gráfico de pizza no meio
+        html.Div([
+            dcc.Graph(id='graph-pizza', config={'displayModeBar': False}, style={'height': '300px'})
+        ], style={'width': '33%', 'display': 'inline-block'}),  # Tamanho ajustado para ficar entre o gráfico de linha e a tabela
+
+        # Tabela de resumo de tipos de lançamento à direita
         html.Div([
             dash_table.DataTable(
                 id='table-resumo',
@@ -206,20 +211,18 @@ app.layout = html.Div(children=[
                 ],
                 data=df_resumo.to_dict('records'),
                 style_table={
-                    'maxHeight': '400px',  # Aumentar a altura da tabela
+                    'maxHeight': '400px',
                     'overflowY': 'auto',
                     'border': '1px solid black'
                 },
-                fixed_rows={'headers': True},  # Fixar cabeçalhos ao rolar
-                style_cell={'textAlign': 'left', 'padding': '8px', 'whiteSpace': 'normal', 'height': 'auto'}  # Quebra de linha nas células
+                fixed_rows={'headers': True},
+                style_cell={'textAlign': 'left', 'padding': '8px', 'whiteSpace': 'normal', 'height': 'auto'}
             ),
             html.Br(),
-
-            # Exibir soma total e saldo final com texto menor
-            html.P(f"Total de Gastos: R$ {gastos_totais:,.2f}", style={'font-size': '12px'}),  # Diminuir o tamanho do texto
-            html.P(f"Orçamento Total: R$ {orcamento_total:,.2f}", style={'font-size': '12px'}),  # Diminuir o tamanho do texto
-            html.P(f"Saldo Final: R$ {saldo_final:,.2f}", style={'font-size': '12px'})  # Diminuir o tamanho do texto
-        ], style={'width': '50%', 'display': 'inline-block', 'verticalAlign': 'top'})
+            html.P(f"Total de Gastos: R$ {gastos_totais:,.2f}", style={'font-size': '12px'}),
+            html.P(f"Orçamento Total: R$ {orcamento_total:,.2f}", style={'font-size': '12px'}),
+            html.P(f"Saldo Final: R$ {saldo_final:,.2f}", style={'font-size': '12px'})
+        ], style={'width': '33%', 'display': 'inline-block', 'verticalAlign': 'top'})
     ], style={'display': 'flex', 'flex-direction': 'row'}),
 
     # Seletor e visualização das duas tabelas lado a lado
@@ -227,8 +230,6 @@ app.layout = html.Div(children=[
         # Tabela de compensação à esquerda
         html.Div([
             html.H2(children='Status de Compensação', style={'display': 'inline-block', 'marginRight': '20px'}),
-
-            # Dropdown ao lado do header
             dcc.Dropdown(
                 id='dropdown-compensacao',
                 options=[
@@ -236,7 +237,7 @@ app.layout = html.Div(children=[
                     {'label': 'Pagantes', 'value': 'sim'},
                     {'label': 'Pendente de Pagamento', 'value': 'não'}
                 ],
-                value='todos',  # Valor inicial
+                value='todos',
                 clearable=False,
                 style={'width': '200px', 'display': 'inline-block'}
             ),
@@ -248,17 +249,15 @@ app.layout = html.Div(children=[
                     {"name": "Valor", "id": '[Recursos financeiros]   Valor'},
                     {"name": "Compensação", "id": '[Recursos financeiros]   Compensação'}
                 ],
-                style_table={'maxHeight': '600px', 'overflowY': 'auto', 'border': '1px solid black'},  # Aumentar altura da tabela
-                fixed_rows={'headers': True},  # Fixar cabeçalhos ao rolar
-                style_cell={'textAlign': 'left', 'padding': '10px', 'whiteSpace': 'normal', 'height': 'auto'}  # Quebra de linha nas células
+                style_table={'maxHeight': '280px', 'overflowY': 'auto', 'border': '1px solid black'},
+                fixed_rows={'headers': True},
+                style_cell={'textAlign': 'left', 'padding': '10px', 'whiteSpace': 'normal', 'height': 'auto'}
             )
-        ], style={'width': '45%', 'display': 'inline-block', 'marginRight': '5%'}),  # Alinhamento e espaçamento
+        ], style={'width': '45%', 'display': 'inline-block', 'marginRight': '5%'}),
 
         # Tabela de visualização das outras abas à direita
         html.Div([
             html.H2(children='Visualização de Outras Abas', style={'display': 'inline-block', 'marginRight': '20px'}),
-
-            # Dropdown ao lado do título
             dcc.Dropdown(
                 id='dropdown-visualizacao',
                 options=[
@@ -266,16 +265,16 @@ app.layout = html.Div(children=[
                     {'label': 'Periódico', 'value': 'periodico'},
                     {'label': 'Jornal e Revista', 'value': 'jornalerevista'}
                 ],
-                value='defesas',  # Valor inicial
+                value='defesas',
                 clearable=False,
                 style={'width': '200px', 'display': 'inline-block'}
             ),
             html.Div(id='tabela-aba')
-        ], style={'width': '45%', 'display': 'inline-block'})  # Ajuste de largura
-    ], style={'display': 'flex', 'flex-direction': 'row', 'marginTop': '30px'})  # Espaçamento entre tabelas
+        ], style={'width': '45%', 'display': 'inline-block'})
+    ], style={'display': 'flex', 'flex-direction': 'row', 'marginTop': '30px'})
 ])
 
-# Callback para atualizar o gráfico com base no tipo de lançamento selecionado
+# Callback para atualizar o gráfico de linha com base no tipo de lançamento selecionado
 @app.callback(
     Output('graph-valores-tempo', 'figure'),
     [Input('dropdown-tipo-lancamento', 'value')]
@@ -292,6 +291,16 @@ def atualizar_grafico(tipo_lancamento):
                   x='[Recursos financeiros]   Data do lançamento', 
                   y='Valor Acumulado', 
                   title='')  # Remover título do gráfico
+    return fig
+
+# Callback para atualizar o gráfico de pizza com os tipos de lançamento
+@app.callback(
+    Output('graph-pizza', 'figure'),
+    [Input('dropdown-tipo-lancamento', 'value')]
+)
+def atualizar_grafico_pizza(tipo_lancamento):
+    fig = px.pie(df_resumo, values='[Recursos financeiros]   Valor', names='[Recursos financeiros]   Tipo de lançamento\n', 
+                 title='Distribuição dos Tipos de Lançamento', color_discrete_sequence=px.colors.qualitative.Set3)
     return fig
 
 # Callback para atualizar a tabela de compensação com base no status de compensação
@@ -324,8 +333,8 @@ def atualizar_tabela(aba_selecionada):
         columns=[{"name": i, "id": i} for i in df_selecionado.columns],
         data=df_selecionado.to_dict('records'),
         style_table={'maxHeight': '400px', 'overflowY': 'auto', 'border': '1px solid black'},
-        fixed_rows={'headers': True},  # Fixar cabeçalhos ao rolar
-        style_cell={'textAlign': 'left', 'padding': '10px', 'whiteSpace': 'normal', 'height': '60px'}  # Altura maior e quebra de linha
+        fixed_rows={'headers': True},
+        style_cell={'textAlign': 'left', 'padding': '10px', 'whiteSpace': 'normal', 'height': '60px'}
     )
 
 # Função para abrir o navegador automaticamente
