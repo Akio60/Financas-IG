@@ -1,6 +1,9 @@
 from oauth2client.service_account import ServiceAccountCredentials
 import gspread
 import pandas as pd
+from dash import Dash, dcc, html
+import dash_table
+from dash.dependencies import Input, Output
 import plotly.express as px
 
 # Definir o escopo da API
@@ -19,15 +22,13 @@ data = sheet.get_all_records()
 # Converter para DataFrame
 df = pd.DataFrame(data)
 
+
+#------------------------------------------------#
+#Tratamento de dados do sheets 
 def atualizar_abas_com_colunas_personalizadas(df, coluna_criterio, client, nome_planilha):
     """
     Atualiza abas no Google Sheets com dados da aba principal, separando por valor de uma coluna
     e copiando colunas específicas de acordo com o valor da coluna critério, evitando duplicatas.
-    
-    :param df: DataFrame da aba principal.
-    :param coluna_criterio: Nome da coluna que serve de critério para separar os dados.
-    :param client: Cliente autorizado do gspread.
-    :param nome_planilha: Nome da planilha do Google Sheets.
     """
 
     # Defina os conjuntos de colunas de interesse com base no valor da coluna critério
@@ -37,7 +38,7 @@ def atualizar_abas_com_colunas_personalizadas(df, coluna_criterio, client, nome_
             '[Recursos financeiros]   Documento do beneficiado',
             '[Recursos financeiros]   Tipo de lançamento\n',
             '[Recursos financeiros]   Data do lançamento ',
-            '[Recursos financeiros]  Valor',
+            '[Recursos financeiros]   Valor',
             '[Recursos financeiros]   Compensação',
             '[Recursos financeiros]   Descrição',
             '[Recursos financeiros]   Enviar email automático de recebimento do valor?'
@@ -109,3 +110,127 @@ def atualizar_abas_com_colunas_personalizadas(df, coluna_criterio, client, nome_
 
 # Chamada da função
 atualizar_abas_com_colunas_personalizadas(df, 'Tipo do requerimento', client, 'Relatórios PPG Geografia (Responses)')
+
+#------------------------------------------------#
+
+# Função para ler os dados das abas
+def ler_aba(nome_planilha, nome_aba):
+    """
+    Função para ler os dados de uma aba específica no Google Sheets e retornar um DataFrame.
+    """
+    sheet = client.open(nome_planilha).worksheet(nome_aba)
+    data = sheet.get_all_records()
+    df = pd.DataFrame(data)
+    return df
+
+# Carregar os dados de Recursos Financeiros
+df_financeiro = ler_aba('Relatórios PPG Geografia (Responses)', 'Recursos financeiros')
+df_defesas = ler_aba('Relatórios PPG Geografia (Responses)', 'Defesas')
+df_periodico = ler_aba('Relatórios PPG Geografia (Responses)', 'Periódico')
+df_jornalerevista = ler_aba('Relatórios PPG Geografia (Responses)', 'Jornal e Revista')
+
+# Converter a coluna de Data do Lançamento para o formato de data
+df_financeiro['[Recursos financeiros]   Data do lançamento'] = pd.to_datetime(df_financeiro['[Recursos financeiros]   Data do lançamento'])
+
+# Ordenar os dados pela Data do Lançamento
+df_financeiro = df_financeiro.sort_values(by='[Recursos financeiros]   Data do lançamento')
+
+# Criar a coluna de valor acumulado
+df_financeiro['Valor Acumulado'] = df_financeiro['[Recursos financeiros]   Valor'].cumsum()
+
+# Gráfico de valores acumulados ao longo do tempo
+fig_valores_tempo = px.line(df_financeiro, 
+                            x='[Recursos financeiros]   Data do lançamento', 
+                            y='Valor Acumulado', 
+                            title='Valores Acumulados ao Longo do Tempo')
+
+# Tabela de resumo por tipo de lançamento
+df_resumo = df_financeiro.groupby('[Recursos financeiros]   Tipo de lançamento\n').agg({'[Recursos financeiros]   Valor': 'sum'}).reset_index()
+
+# Valor arbitrário do orçamento
+orcamento_total = 500000
+gastos_totais = df_resumo['[Recursos financeiros]   Valor'].sum()
+saldo_final = orcamento_total - gastos_totais
+
+# Criar o app Dash
+app = Dash(__name__)
+
+# Layout do Dashboard
+app.layout = html.Div(children=[
+    html.H1(children='Dashboard de Relatórios PPG Geografia'),
+
+    # Layout da parte superior
+    html.Div([
+        # Gráfico na parte superior esquerda
+        html.Div([
+            dcc.Graph(
+                id='graph-valores-tempo',
+                figure=fig_valores_tempo
+            )
+        ], style={'width': '50%', 'display': 'inline-block'}),
+
+        # Tabela de resumo na parte superior direita
+        html.Div([
+            dash_table.DataTable(
+                id='table-resumo',
+                columns=[
+                    {"name": "Tipo de Lançamento", "id": '[Recursos financeiros]   Tipo de lançamento\n'},
+                    {"name": "Soma dos Valores"  , "id": '[Recursos financeiros]   Valor'}
+                ],
+                data=df_resumo.to_dict('records'),
+                style_table={
+                    'maxHeight': '300px',
+                    'overflowY': 'auto',
+                    'border': '1px solid black'
+                },
+                style_cell={'textAlign': 'left', 'padding': '10px'}
+            ),
+            html.Br(),
+
+            # Exibir soma total e saldo final
+            html.P(f"Total de Gastos: R$ {gastos_totais:,.2f}"),
+            html.P(f"Orçamento Total: R$ {orcamento_total:,.2f}"),
+            html.P(f"Saldo Final: R$ {saldo_final:,.2f}")
+        ], style={'width': '50%', 'display': 'inline-block', 'verticalAlign': 'top'})
+    ], style={'display': 'flex', 'flex-direction': 'row'}),
+
+    html.H2(children='Visualização de Outras Abas'),
+
+    # Seletor para a visualização das outras abas
+    dcc.Dropdown(
+        id='dropdown-visualizacao',
+        options=[
+            {'label': 'Defesas', 'value': 'defesas'},
+            {'label': 'Periódico', 'value': 'periodico'},
+            {'label': 'Jornal e Revista', 'value': 'jornalerevista'}
+        ],
+        value='defesas'  # Valor inicial
+    ),
+
+    # Tabela que será atualizada com base na seleção
+    html.Div(id='tabela-aba')
+])
+
+# Callback para atualizar a tabela com base na seleção do dropdown
+@app.callback(
+    Output('tabela-aba', 'children'),
+    [Input('dropdown-visualizacao', 'value')]
+)
+def atualizar_tabela(aba_selecionada):
+    if aba_selecionada == 'defesas':
+        df_selecionado = df_defesas
+    elif aba_selecionada == 'periodico':
+        df_selecionado = df_periodico
+    else:
+        df_selecionado = df_jornalerevista
+
+    return dash_table.DataTable(
+        columns=[{"name": i, "id": i} for i in df_selecionado.columns],
+        data=df_selecionado.to_dict('records'),
+        style_table={'maxHeight': '400px', 'overflowY': 'auto', 'border': '1px solid black'},
+        style_cell={'textAlign': 'left', 'padding': '10px'}
+    )
+
+# Rodar o servidor
+if __name__ == '__main__':
+    app.run_server(debug=True)
