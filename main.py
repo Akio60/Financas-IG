@@ -5,6 +5,8 @@ from dash import Dash, dcc, html
 import dash_table
 from dash.dependencies import Input, Output
 import plotly.express as px
+import webbrowser
+from threading import Timer
 
 # Definir o escopo da API
 scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
@@ -113,6 +115,23 @@ atualizar_abas_com_colunas_personalizadas(df, 'Tipo do requerimento', client, 'R
 
 #------------------------------------------------#
 
+from oauth2client.service_account import ServiceAccountCredentials
+import gspread
+import pandas as pd
+from dash import Dash, dcc, html
+import dash_table
+from dash.dependencies import Input, Output
+import plotly.express as px
+import webbrowser
+from threading import Timer
+
+# Definir o escopo da API
+scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+
+# Autenticação com as credenciais
+creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
+client = gspread.authorize(creds)
+
 # Função para ler os dados das abas
 def ler_aba(nome_planilha, nome_aba):
     """
@@ -135,14 +154,10 @@ df_financeiro['[Recursos financeiros]   Data do lançamento'] = pd.to_datetime(d
 # Ordenar os dados pela Data do Lançamento
 df_financeiro = df_financeiro.sort_values(by='[Recursos financeiros]   Data do lançamento')
 
-# Criar a coluna de valor acumulado
-df_financeiro['Valor Acumulado'] = df_financeiro['[Recursos financeiros]   Valor'].cumsum()
-
-# Gráfico de valores acumulados ao longo do tempo
-fig_valores_tempo = px.line(df_financeiro, 
-                            x='[Recursos financeiros]   Data do lançamento', 
-                            y='Valor Acumulado', 
-                            title='Valores Acumulados ao Longo do Tempo')
+# Criar uma coluna de status de compensação ajustada
+df_financeiro['[Recursos financeiros]   Compensação'] = df_financeiro['[Recursos financeiros]   Compensação'].apply(
+    lambda x: 'sim' if x.lower() == 'sim' else 'não'
+)
 
 # Tabela de resumo por tipo de lançamento
 df_resumo = df_financeiro.groupby('[Recursos financeiros]   Tipo de lançamento\n').agg({'[Recursos financeiros]   Valor': 'sum'}).reset_index()
@@ -151,6 +166,11 @@ df_resumo = df_financeiro.groupby('[Recursos financeiros]   Tipo de lançamento\
 orcamento_total = 500000
 gastos_totais = df_resumo['[Recursos financeiros]   Valor'].sum()
 saldo_final = orcamento_total - gastos_totais
+
+# Função para remover prefixos de colunas para a visualização de abas
+def simplificar_colunas(df):
+    df_simplificado = df.rename(columns=lambda x: x.split('] ')[-1] if ']' in x else x)
+    return df_simplificado
 
 # Criar o app Dash
 app = Dash(__name__)
@@ -163,10 +183,17 @@ app.layout = html.Div(children=[
     html.Div([
         # Gráfico na parte superior esquerda
         html.Div([
-            dcc.Graph(
-                id='graph-valores-tempo',
-                figure=fig_valores_tempo
-            )
+            # Texto e Dropdown ao lado (alinhados horizontalmente)
+            html.Label('Tipo de Lançamento:', style={'font-size': '12px', 'display': 'inline-block', 'marginRight': '15px'}),
+            dcc.Dropdown(
+                id='dropdown-tipo-lancamento',
+                options=[{'label': 'Todos os Tipos', 'value': 'todos'}] +
+                         [{'label': tipo, 'value': tipo} for tipo in df_financeiro['[Recursos financeiros]   Tipo de lançamento\n'].unique()],
+                value='todos',  # Valor inicial: Todos os Tipos
+                clearable=False,
+                style={'width': 'auto', 'display': 'inline-block', 'min-width': '400px', 'max-width': '600px'}  # Tamanho flexível
+            ),
+            dcc.Graph(id='graph-valores-tempo', config={'displayModeBar': False}, style={'height': '300px'})  # Reduzir altura do gráfico
         ], style={'width': '50%', 'display': 'inline-block'}),
 
         # Tabela de resumo na parte superior direita
@@ -175,62 +202,137 @@ app.layout = html.Div(children=[
                 id='table-resumo',
                 columns=[
                     {"name": "Tipo de Lançamento", "id": '[Recursos financeiros]   Tipo de lançamento\n'},
-                    {"name": "Soma dos Valores"  , "id": '[Recursos financeiros]   Valor'}
+                    {"name": "Soma dos Valores", "id": '[Recursos financeiros]   Valor'}
                 ],
                 data=df_resumo.to_dict('records'),
                 style_table={
-                    'maxHeight': '300px',
+                    'maxHeight': '400px',  # Aumentar a altura da tabela
                     'overflowY': 'auto',
                     'border': '1px solid black'
                 },
-                style_cell={'textAlign': 'left', 'padding': '10px'}
+                fixed_rows={'headers': True},  # Fixar cabeçalhos ao rolar
+                style_cell={'textAlign': 'left', 'padding': '8px', 'whiteSpace': 'normal', 'height': 'auto'}  # Quebra de linha nas células
             ),
             html.Br(),
 
-            # Exibir soma total e saldo final
-            html.P(f"Total de Gastos: R$ {gastos_totais:,.2f}"),
-            html.P(f"Orçamento Total: R$ {orcamento_total:,.2f}"),
-            html.P(f"Saldo Final: R$ {saldo_final:,.2f}")
+            # Exibir soma total e saldo final com texto menor
+            html.P(f"Total de Gastos: R$ {gastos_totais:,.2f}", style={'font-size': '12px'}),  # Diminuir o tamanho do texto
+            html.P(f"Orçamento Total: R$ {orcamento_total:,.2f}", style={'font-size': '12px'}),  # Diminuir o tamanho do texto
+            html.P(f"Saldo Final: R$ {saldo_final:,.2f}", style={'font-size': '12px'})  # Diminuir o tamanho do texto
         ], style={'width': '50%', 'display': 'inline-block', 'verticalAlign': 'top'})
     ], style={'display': 'flex', 'flex-direction': 'row'}),
 
-    html.H2(children='Visualização de Outras Abas'),
+    # Seletor e visualização das duas tabelas lado a lado
+    html.Div([
+        # Tabela de compensação à esquerda
+        html.Div([
+            html.H2(children='Status de Compensação', style={'display': 'inline-block', 'marginRight': '20px'}),
 
-    # Seletor para a visualização das outras abas
-    dcc.Dropdown(
-        id='dropdown-visualizacao',
-        options=[
-            {'label': 'Defesas', 'value': 'defesas'},
-            {'label': 'Periódico', 'value': 'periodico'},
-            {'label': 'Jornal e Revista', 'value': 'jornalerevista'}
-        ],
-        value='defesas'  # Valor inicial
-    ),
+            # Dropdown ao lado do header
+            dcc.Dropdown(
+                id='dropdown-compensacao',
+                options=[
+                    {'label': 'Todos os Nomes', 'value': 'todos'},
+                    {'label': 'Pagantes', 'value': 'sim'},
+                    {'label': 'Pendente de Pagamento', 'value': 'não'}
+                ],
+                value='todos',  # Valor inicial
+                clearable=False,
+                style={'width': '200px', 'display': 'inline-block'}
+            ),
+            dash_table.DataTable(
+                id='table-compensacao',
+                columns=[
+                    {"name": "Nome", "id": '[Recursos financeiros]   Nome do beneficiado'},
+                    {"name": "Tipo de Lançamento", "id": '[Recursos financeiros]   Tipo de lançamento\n'},
+                    {"name": "Valor", "id": '[Recursos financeiros]   Valor'},
+                    {"name": "Compensação", "id": '[Recursos financeiros]   Compensação'}
+                ],
+                style_table={'maxHeight': '600px', 'overflowY': 'auto', 'border': '1px solid black'},  # Aumentar altura da tabela
+                fixed_rows={'headers': True},  # Fixar cabeçalhos ao rolar
+                style_cell={'textAlign': 'left', 'padding': '10px', 'whiteSpace': 'normal', 'height': 'auto'}  # Quebra de linha nas células
+            )
+        ], style={'width': '45%', 'display': 'inline-block', 'marginRight': '5%'}),  # Alinhamento e espaçamento
 
-    # Tabela que será atualizada com base na seleção
-    html.Div(id='tabela-aba')
+        # Tabela de visualização das outras abas à direita
+        html.Div([
+            html.H2(children='Visualização de Outras Abas', style={'display': 'inline-block', 'marginRight': '20px'}),
+
+            # Dropdown ao lado do título
+            dcc.Dropdown(
+                id='dropdown-visualizacao',
+                options=[
+                    {'label': 'Defesas', 'value': 'defesas'},
+                    {'label': 'Periódico', 'value': 'periodico'},
+                    {'label': 'Jornal e Revista', 'value': 'jornalerevista'}
+                ],
+                value='defesas',  # Valor inicial
+                clearable=False,
+                style={'width': '200px', 'display': 'inline-block'}
+            ),
+            html.Div(id='tabela-aba')
+        ], style={'width': '45%', 'display': 'inline-block'})  # Ajuste de largura
+    ], style={'display': 'flex', 'flex-direction': 'row', 'marginTop': '30px'})  # Espaçamento entre tabelas
 ])
 
-# Callback para atualizar a tabela com base na seleção do dropdown
+# Callback para atualizar o gráfico com base no tipo de lançamento selecionado
+@app.callback(
+    Output('graph-valores-tempo', 'figure'),
+    [Input('dropdown-tipo-lancamento', 'value')]
+)
+def atualizar_grafico(tipo_lancamento):
+    if tipo_lancamento == 'todos':
+        df_filtrado = df_financeiro.copy()  # Todos os tipos
+    else:
+        df_filtrado = df_financeiro[df_financeiro['[Recursos financeiros]   Tipo de lançamento\n'] == tipo_lancamento]
+
+    df_filtrado['Valor Acumulado'] = df_filtrado['[Recursos financeiros]   Valor'].cumsum()
+
+    fig = px.line(df_filtrado, 
+                  x='[Recursos financeiros]   Data do lançamento', 
+                  y='Valor Acumulado', 
+                  title='')  # Remover título do gráfico
+    return fig
+
+# Callback para atualizar a tabela de compensação com base no status de compensação
+@app.callback(
+    Output('table-compensacao', 'data'),
+    [Input('dropdown-compensacao', 'value')]
+)
+def atualizar_tabela_compensacao(status_compensacao):
+    if status_compensacao == 'todos':
+        df_filtrado = df_financeiro
+    else:
+        df_filtrado = df_financeiro[df_financeiro['[Recursos financeiros]   Compensação'] == status_compensacao]
+
+    return df_filtrado.to_dict('records')
+
+# Callback para atualizar a tabela com base na seleção do dropdown e simplificar colunas
 @app.callback(
     Output('tabela-aba', 'children'),
     [Input('dropdown-visualizacao', 'value')]
 )
 def atualizar_tabela(aba_selecionada):
     if aba_selecionada == 'defesas':
-        df_selecionado = df_defesas
+        df_selecionado = simplificar_colunas(df_defesas)
     elif aba_selecionada == 'periodico':
-        df_selecionado = df_periodico
+        df_selecionado = simplificar_colunas(df_periodico)
     else:
-        df_selecionado = df_jornalerevista
+        df_selecionado = simplificar_colunas(df_jornalerevista)
 
     return dash_table.DataTable(
         columns=[{"name": i, "id": i} for i in df_selecionado.columns],
         data=df_selecionado.to_dict('records'),
         style_table={'maxHeight': '400px', 'overflowY': 'auto', 'border': '1px solid black'},
-        style_cell={'textAlign': 'left', 'padding': '10px'}
+        fixed_rows={'headers': True},  # Fixar cabeçalhos ao rolar
+        style_cell={'textAlign': 'left', 'padding': '10px', 'whiteSpace': 'normal', 'height': '60px'}  # Altura maior e quebra de linha
     )
 
-# Rodar o servidor
+# Função para abrir o navegador automaticamente
+def open_browser():
+    webbrowser.open_new('http://127.0.0.1:8050/')
+
+# Rodar o servidor e abrir o navegador automaticamente
 if __name__ == '__main__':
+    Timer(1, open_browser).start()  # Abre o navegador automaticamente após 1 segundo
     app.run_server(debug=True)
