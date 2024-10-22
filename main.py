@@ -51,12 +51,13 @@ def atualizar_abas_com_colunas_personalizadas(df, coluna_criterio, client, nome_
         'Periódico': [
             '[Periódico]   Autor',
             '[Periódico]   Ano',
-            '[Periódico]   Título'
+            '[Periódico]   Título',
+            '[Periódico]   Referencia'
         ],
         'Jornal e Revista': [
-            '[Jornal e Revista]   Titulo',
             '[Jornal e Revista]   Autor',
-            '[Jornal e Revista]   Ano'
+            '[Jornal e Revista]   Ano',
+            '[Jornal e Revista]   Titulo',
         ]
     }
 
@@ -78,6 +79,9 @@ def atualizar_abas_com_colunas_personalizadas(df, coluna_criterio, client, nome_
         # Filtrar o DataFrame pelos dados do valor da coluna_criterio
         df_filtrado = df[df[coluna_criterio] == valor][colunas_interesse]
         
+        # Substituir NaN por string vazia para evitar erro de JSON
+        df_filtrado = df_filtrado.fillna('')
+
         # Nome da aba correspondente ao valor da coluna_criterio
         aba_nome = str(valor)
 
@@ -95,7 +99,6 @@ def atualizar_abas_com_colunas_personalizadas(df, coluna_criterio, client, nome_
             worksheet = sheet.add_worksheet(title=aba_nome, rows="1000", cols="20")
             df_atualizado = df_filtrado
 
-
         # Limpar o conteúdo existente na aba e escrever os dados atualizados
         worksheet.clear()
 
@@ -104,4 +107,5 @@ def atualizar_abas_com_colunas_personalizadas(df, coluna_criterio, client, nome_
 
     print(f"Dados atualizados nas abas com base na coluna {coluna_criterio}, sem duplicatas.")
 
+# Chamada da função
 atualizar_abas_com_colunas_personalizadas(df, 'Tipo do requerimento', client, 'Relatórios PPG Geografia (Responses)')
