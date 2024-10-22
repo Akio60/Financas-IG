@@ -3,7 +3,7 @@
 Foi realizado um login para o acesso do drive e forms, para centralizar e facilitar o acesso:
 
 login: financas.ig.nubia@gmail.com
-senha: unicamp123
+senha: ******
 
 Até o momento foram utilizados algumas bibliotecas que devem ser lembradas para o empacotamento final
 sao elas: (pip install, no ambiente de trabalho)
