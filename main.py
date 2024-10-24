@@ -35,11 +35,11 @@ def atualizar_abas_com_colunas_personalizadas(df, coluna_criterio, client, nome_
 
     # Defina os conjuntos de colunas de interesse com base no valor da coluna critério
     colunas_interesse_dict = {
-        'Recursos financeiros': [
+        'Recursos Financeiros': [
             '[Recursos financeiros]   Nome do beneficiado',
             '[Recursos financeiros]   Documento do beneficiado',
-            '[Recursos financeiros]   Tipo de lançamento\n',
-            '[Recursos financeiros]   Data do lançamento ',
+            '[Recursos financeiros]   Tipo de lançamento',
+            '[Recursos financeiros]   Data do lançamento',
             '[Recursos financeiros]   Valor',
             '[Recursos financeiros]   Compensação',
             '[Recursos financeiros]   Descrição',
@@ -74,7 +74,7 @@ def atualizar_abas_com_colunas_personalizadas(df, coluna_criterio, client, nome_
     for valor in valores_unicos:
         # Verifica se há colunas de interesse definidas para o valor
         colunas_interesse = colunas_interesse_dict.get(valor)
-        
+        print(valor)
         if colunas_interesse is None:
             print(f"Não há colunas de interesse definidas para o valor '{valor}' na coluna critério.")
             continue
@@ -116,23 +116,6 @@ atualizar_abas_com_colunas_personalizadas(df, 'Tipo do requerimento', client, 'R
 #------------------------------------------------#
 
 
-from oauth2client.service_account import ServiceAccountCredentials
-import gspread
-import pandas as pd
-from dash import Dash, dcc, html
-import dash_table
-from dash.dependencies import Input, Output
-import plotly.express as px
-import webbrowser
-from threading import Timer
-
-# Definir o escopo da API
-scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-
-# Autenticação com as credenciais
-creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
-client = gspread.authorize(creds)
-
 # Função para ler os dados das abas
 def ler_aba(nome_planilha, nome_aba):
     """
@@ -144,7 +127,7 @@ def ler_aba(nome_planilha, nome_aba):
     return df
 
 # Carregar os dados de Recursos Financeiros
-df_financeiro = ler_aba('Relatórios PPG Geografia (Responses)', 'Recursos financeiros')
+df_financeiro = ler_aba('Relatórios PPG Geografia (Responses)', 'Recursos Financeiros')
 df_defesas = ler_aba('Relatórios PPG Geografia (Responses)', 'Defesas')
 df_periodico = ler_aba('Relatórios PPG Geografia (Responses)', 'Periódico')
 df_jornalerevista = ler_aba('Relatórios PPG Geografia (Responses)', 'Jornal e Revista')
@@ -157,11 +140,11 @@ df_financeiro = df_financeiro.sort_values(by='[Recursos financeiros]   Data do l
 
 # Criar uma coluna de status de compensação ajustada
 df_financeiro['[Recursos financeiros]   Compensação'] = df_financeiro['[Recursos financeiros]   Compensação'].apply(
-    lambda x: 'sim' if x.lower() == 'sim' else 'não'
+    lambda x: 'Sim' if x.lower() == 'sim' else 'não'
 )
 
 # Tabela de resumo por tipo de lançamento
-df_resumo = df_financeiro.groupby('[Recursos financeiros]   Tipo de lançamento\n').agg({'[Recursos financeiros]   Valor': 'sum'}).reset_index()
+df_resumo = df_financeiro.groupby('[Recursos financeiros]   Tipo de lançamento').agg({'[Recursos financeiros]   Valor': 'sum'}).reset_index()
 
 # Valor arbitrário do orçamento
 orcamento_total = 500000
@@ -173,43 +156,53 @@ def simplificar_colunas(df):
     df_simplificado = df.rename(columns=lambda x: x.split('] ')[-1] if ']' in x else x)
     return df_simplificado
 
+# Função para formatar valores como moeda (R$)
+def formatar_moeda(valor):
+    return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+# Aplicar formatação **apenas para exibição** nos valores das tabelas, sem alterar os dados usados no gráfico
+df_resumo_exibicao = df_resumo.copy()
+df_resumo_exibicao['[Recursos financeiros]   Valor'] = df_resumo_exibicao['[Recursos financeiros]   Valor'].apply(formatar_moeda)
+df_financeiro_exibicao = df_financeiro.copy()
+df_financeiro_exibicao['[Recursos financeiros]   Valor'] = df_financeiro_exibicao['[Recursos financeiros]   Valor'].apply(formatar_moeda)
+
 # Criar o app Dash
 app = Dash(__name__)
 
 # Layout do Dashboard
 app.layout = html.Div(children=[
-    html.H1(children='Dashboard de Relatórios PPG Geografia'),
+    html.H1(children='Relatório PPG Geografia'),
 
     # Layout da parte superior com gráfico de linha, gráfico de pizza e tabela
     html.Div([
         # Gráfico de linha na parte superior esquerda
         html.Div([
-            html.Label('Tipo de Lançamento:', style={'font-size': '12px', 'display': 'inline-block', 'marginRight': '15px'}),
+            html.Label('Tipo de Lançamento:', style={'font-size': '15px', 'display': 'inline-block', 'marginRight': '15px'}),
             dcc.Dropdown(
                 id='dropdown-tipo-lancamento',
                 options=[{'label': 'Todos os Tipos', 'value': 'todos'}] +
-                         [{'label': tipo, 'value': tipo} for tipo in df_financeiro['[Recursos financeiros]   Tipo de lançamento\n'].unique()],
+                         [{'label': tipo, 'value': tipo} for tipo in df_financeiro['[Recursos financeiros]   Tipo de lançamento'].unique()],
                 value='todos',  # Valor inicial: Todos os Tipos
                 clearable=False,
-                style={'width': 'auto', 'display': 'inline-block', 'min-width': '400px', 'max-width': '600px'}
+                style={'width': 'auto', 'display': 'inline-block', 'min-width': '400px', 'max-width': '600px','height': '25px'}
             ),
-            dcc.Graph(id='graph-valores-tempo', config={'displayModeBar': False}, style={'height': '300px'})
-        ], style={'width': '33%', 'display': 'inline-block'}),  # Tamanho ajustado para ficar ao lado do gráfico de pizza e da tabela
+            dcc.Graph(id='graph-valores-tempo', config={'displayModeBar': False}, style={'height': '400px'})
+        ], style={'width': '33%', 'display': 'inline-block'}),
 
         # Gráfico de pizza no meio
         html.Div([
-            dcc.Graph(id='graph-pizza', config={'displayModeBar': False}, style={'height': '300px'})
-        ], style={'width': '33%', 'display': 'inline-block'}),  # Tamanho ajustado para ficar entre o gráfico de linha e a tabela
+            dcc.Graph(id='graph-pizza', config={'displayModeBar': False}, style={'height': '450px'})
+        ], style={'width': '33%', 'display': 'inline-block'}),
 
         # Tabela de resumo de tipos de lançamento à direita
         html.Div([
             dash_table.DataTable(
                 id='table-resumo',
                 columns=[
-                    {"name": "Tipo de Lançamento", "id": '[Recursos financeiros]   Tipo de lançamento\n'},
+                    {"name": "Tipo de Lançamento", "id": '[Recursos financeiros]   Tipo de lançamento'},
                     {"name": "Soma dos Valores", "id": '[Recursos financeiros]   Valor'}
                 ],
-                data=df_resumo.to_dict('records'),
+                data=df_resumo_exibicao.to_dict('records'),  # Usar a tabela com os valores formatados
                 style_table={
                     'maxHeight': '400px',
                     'overflowY': 'auto',
@@ -219,9 +212,9 @@ app.layout = html.Div(children=[
                 style_cell={'textAlign': 'left', 'padding': '8px', 'whiteSpace': 'normal', 'height': 'auto'}
             ),
             html.Br(),
-            html.P(f"Total de Gastos: R$ {gastos_totais:,.2f}", style={'font-size': '12px'}),
-            html.P(f"Orçamento Total: R$ {orcamento_total:,.2f}", style={'font-size': '12px'}),
-            html.P(f"Saldo Final: R$ {saldo_final:,.2f}", style={'font-size': '12px'})
+            html.P(f"Total de Gastos: {formatar_moeda(gastos_totais)}", style={'font-size': '12px'}),
+            html.P(f"Orçamento Total: {formatar_moeda(orcamento_total)}", style={'font-size': '12px'}),
+            html.P(f"Saldo Final: {formatar_moeda(saldo_final)}", style={'font-size': '12px'})
         ], style={'width': '33%', 'display': 'inline-block', 'verticalAlign': 'top'})
     ], style={'display': 'flex', 'flex-direction': 'row'}),
 
@@ -234,7 +227,7 @@ app.layout = html.Div(children=[
                 id='dropdown-compensacao',
                 options=[
                     {'label': 'Todos os Nomes', 'value': 'todos'},
-                    {'label': 'Pagantes', 'value': 'sim'},
+                    {'label': 'Pagantes', 'value': 'Sim'},
                     {'label': 'Pendente de Pagamento', 'value': 'não'}
                 ],
                 value='todos',
@@ -245,13 +238,25 @@ app.layout = html.Div(children=[
                 id='table-compensacao',
                 columns=[
                     {"name": "Nome", "id": '[Recursos financeiros]   Nome do beneficiado'},
-                    {"name": "Tipo de Lançamento", "id": '[Recursos financeiros]   Tipo de lançamento\n'},
+                    {"name": "Tipo de Lançamento", "id": '[Recursos financeiros]   Tipo de lançamento'},
                     {"name": "Valor", "id": '[Recursos financeiros]   Valor'},
-                    {"name": "Compensação", "id": '[Recursos financeiros]   Compensação'}
+                    {"name": "Pago", "id": '[Recursos financeiros]   Compensação'}
                 ],
+                data=df_financeiro_exibicao.to_dict('records'),  # Usar a tabela com os valores formatados
                 style_table={'maxHeight': '280px', 'overflowY': 'auto', 'border': '1px solid black'},
                 fixed_rows={'headers': True},
-                style_cell={'textAlign': 'left', 'padding': '10px', 'whiteSpace': 'normal', 'height': 'auto'}
+                style_cell={
+                    'textAlign': 'left',
+                    'padding': '10px',
+                    'whiteSpace': 'normal',
+                    'height': 'auto'
+                },
+                style_cell_conditional=[
+                    {'if': {'column_id': '[Recursos financeiros]   Nome do beneficiado'}, 'width': '380px'},  # Reduzir largura da coluna "Nome"
+                    {'if': {'column_id': '[Recursos financeiros]   Tipo de lançamentor'}, 'width': '100px'},  # Ajustar largura da coluna "Valor"
+                    {'if': {'column_id': '[Recursos financeiros]   Valor'}, 'width': '60px'},  # Ajustar largura da coluna "Valor"
+                    {'if': {'column_id': '[Recursos financeiros]   Compensação'}, 'width': '60px'}  # Ajustar largura da coluna "Valor"
+                ]
             )
         ], style={'width': '45%', 'display': 'inline-block', 'marginRight': '5%'}),
 
@@ -283,9 +288,10 @@ def atualizar_grafico(tipo_lancamento):
     if tipo_lancamento == 'todos':
         df_filtrado = df_financeiro.copy()  # Todos os tipos
     else:
-        df_filtrado = df_financeiro[df_financeiro['[Recursos financeiros]   Tipo de lançamento\n'] == tipo_lancamento]
+        df_filtrado = df_financeiro[df_financeiro['[Recursos financeiros]   Tipo de lançamento'] == tipo_lancamento]
 
-    df_filtrado['Valor Acumulado'] = df_filtrado['[Recursos financeiros]   Valor'].cumsum()
+    # Não alterar os valores no gráfico, manter como float
+    df_filtrado['Valor Acumulado'] = df_filtrado['[Recursos financeiros]   Valor'].astype(float).cumsum()
 
     fig = px.line(df_filtrado, 
                   x='[Recursos financeiros]   Data do lançamento', 
@@ -299,7 +305,7 @@ def atualizar_grafico(tipo_lancamento):
     [Input('dropdown-tipo-lancamento', 'value')]
 )
 def atualizar_grafico_pizza(tipo_lancamento):
-    fig = px.pie(df_resumo, values='[Recursos financeiros]   Valor', names='[Recursos financeiros]   Tipo de lançamento\n', 
+    fig = px.pie(df_resumo, values='[Recursos financeiros]   Valor', names='[Recursos financeiros]   Tipo de lançamento', 
                  title='Distribuição dos Tipos de Lançamento', color_discrete_sequence=px.colors.qualitative.Set3)
     return fig
 
