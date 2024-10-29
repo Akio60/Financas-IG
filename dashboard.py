@@ -33,7 +33,7 @@ def iniciar_dashboard():
     df_financeiro['[Recursos financeiros]   Data do lançamento'] = pd.to_datetime(df_financeiro['[Recursos financeiros]   Data do lançamento'])
     df_financeiro = df_financeiro.sort_values(by='[Recursos financeiros]   Data do lançamento')
     gastos_totais = df_financeiro['[Recursos financeiros]   Valor'].sum()
-    saldo_final = orcamento_total - gastos_totais  # Calcula o saldo com o orçamento atualizado
+    saldo_final = float(orcamento_total) - float(gastos_totais)  # Calcula o saldo com o orçamento atualizado
 
     # Resumo para o gráfico de pizza
     df_resumo = df_financeiro.groupby('[Recursos financeiros]   Tipo de lançamento').agg({'[Recursos financeiros]   Valor': 'sum'}).reset_index()

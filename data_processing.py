@@ -32,6 +32,7 @@ def atualizar_abas_com_colunas_personalizadas(df, coluna_criterio, client, nome_
     # Defina os conjuntos de colunas de interesse com base no valor da coluna critério
     colunas_interesse_dict = {
         'Recursos Financeiros': [
+            'Tipo do requerimento',
             '[Recursos financeiros]   Nome do beneficiado',
             '[Recursos financeiros]   Documento do beneficiado',
             '[Recursos financeiros]   Tipo de lançamento',
@@ -42,18 +43,21 @@ def atualizar_abas_com_colunas_personalizadas(df, coluna_criterio, client, nome_
             '[Recursos financeiros]   Email do beneficiado'
         ],
         'Defesas': [
+            'Tipo do requerimento',
             '[Defesas]   Data da defesa',
             '[Defesas]   Autor',
             '[Defesas]   Tipo de Defesa',
             '[Defesas]   Título '
         ],
         'Periódico': [
+            'Tipo do requerimento',
             '[Periódico]   Autor',
             '[Periódico]   Ano',
             '[Periódico]   Título',
             '[Periódico]   Referencia'
         ],
         'Jornal e Revista': [
+            'Tipo do requerimento',
             '[Jornal e Revista]   Autor',
             '[Jornal e Revista]   Ano',
             '[Jornal e Revista]   Titulo',
