@@ -223,6 +223,57 @@ def mostrar_dados_aba(nome_aba, client):
     tk.Button(frame_actions, text="Editar Item Selecionado", command=editar_item, bg="#27AE60", fg="#ECF0F1", width=20).pack(side="left", padx=5)
     tk.Button(frame_actions, text="Remover Item Selecionado", command=remover_item, bg="#E74C3C", fg="#ECF0F1", width=20).pack(side="right", padx=5)
 
+def abrir_envio_emails():
+    envio_emails_janela = tk.Toplevel()
+    envio_emails_janela.title("Envio de E-mails")
+    envio_emails_janela.geometry("400x250")
+    envio_emails_janela.configure(bg="#2C3E50")
+    
+    tk.Label(envio_emails_janela, text="Envio de E-mails", font=("Helvetica", 14), bg="#2C3E50", fg="#ECF0F1").pack(pady=10)
+    
+    tk.Button(envio_emails_janela, text="Enviar E-mails aos Não Pagantes", bg="#2980B9", fg="#ECF0F1", width=30, height=2).pack(pady=5)
+    tk.Button(envio_emails_janela, text="Enviar Confirmação de Recebimento", bg="#2980B9", fg="#ECF0F1", width=30, height=2).pack(pady=5)
+    
+    def abrir_configuracao_emails():
+        config_emails_janela = tk.Toplevel()
+        config_emails_janela.title("Configuração de E-mails")
+        config_emails_janela.geometry("400x300")
+        config_emails_janela.configure(bg="#2C3E50")
+        
+        tk.Label(config_emails_janela, text="Configurações de E-mails Padrão", font=("Helvetica", 14), bg="#2C3E50", fg="#ECF0F1").pack(pady=10)
+        
+        email_nao_pagantes = tk.Text(config_emails_janela, height=4, width=40)
+        email_confirmacao_recebimento = tk.Text(config_emails_janela, height=4, width=40)
+        
+        # Carregar e-mails padrão das configurações
+        def carregar_emails_padrao():
+            client, _ = autenticar_google_sheets('credentials.json', 'Configurações')
+            sheet_config = client.open("Configurações").sheet1
+            config_data = sheet_config.get_all_records()
+            email_nao_pagantes.insert("1.0", config_data[0].get("Email Não Pagantes", ""))
+            email_confirmacao_recebimento.insert("1.0", config_data[0].get("Email Confirmação", ""))
+        
+        carregar_emails_padrao()
+        
+        tk.Label(config_emails_janela, text="E-mail para Não Pagantes:", bg="#2C3E50", fg="#ECF0F1").pack()
+        email_nao_pagantes.pack(pady=5)
+        
+        tk.Label(config_emails_janela, text="E-mail de Confirmação de Recebimento:", bg="#2C3E50", fg="#ECF0F1").pack()
+        email_confirmacao_recebimento.pack(pady=5)
+        
+        def salvar_emails_padrao():
+            client, _ = autenticar_google_sheets('credentials.json', 'Configurações')
+            sheet_config = client.open("Configurações").sheet1
+            sheet_config.update("A1", [["Link Personalizado", "Orçamento Total", "Email Não Pagantes", "Email Confirmação"]])
+            sheet_config.update("A2", [[link_personalizado, orcamento_total, email_nao_pagantes.get("1.0", "end-1c"), email_confirmacao_recebimento.get("1.0", "end-1c")]])
+            messagebox.showinfo("Configurações Salvas", "E-mails padrão atualizados com sucesso!")
+            config_emails_janela.destroy()
+        
+        tk.Button(config_emails_janela, text="Salvar Configurações de E-mails", command=salvar_emails_padrao, bg="#27AE60", fg="#ECF0F1").pack(pady=10)
+    
+    tk.Button(envio_emails_janela, text="Configuração de E-mails", command=abrir_configuracao_emails, bg="#2980B9", fg="#ECF0F1", width=30, height=2).pack(pady=5)
+
+
 def iniciar_interface():
     carregar_dados_e_atualizar_abas()
     carregar_configuracoes()
@@ -257,7 +308,7 @@ def iniciar_interface():
     botao_acoes_esquerda = {
         "Dashboard": iniciar_dashboard_thread,
         "Adicionar registro": abrir_link,
-        "Envio de Emails": lambda: print("Funcionalidade de envio de emails"),
+        "Envio de Emails": abrir_envio_emails,
         "Configurações": abrir_configuracoes
     }
     for label, command in botao_acoes_esquerda.items():
