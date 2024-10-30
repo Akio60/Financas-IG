@@ -181,13 +181,23 @@ def mostrar_dados_aba(nome_aba, client):
 
         def salvar_edicao():
             novo_valor = [entradas[col].get() for col in colunas]
-            aba_principal.delete_rows(index + 2)  # Remove o registro antigo da planilha principal
+            try:
+                # Remover o registro antigo e adicionar o novo na aba correspondente
+                index = df.index[df[colunas[0]] == valores[0]].tolist()[0]
+                aba_principal.delete_rows(index + 2)  # Remove a linha original
 
-            aba_principal.append_row(novo_valor)  # Adiciona o registro editado
-            atualizar_abas_com_colunas_personalizadas(df, 'Tipo do requerimento', client, 'Relatórios PPG Geografia (Responses)')
-            registrar_alteracao(client, "Edição", valores)
-            messagebox.showinfo("Salvo", "Dados atualizados com sucesso!")
-            editar_janela.destroy()
+                # Adiciona o registro editado
+                aba_principal.append_row(novo_valor)
+                
+                # Atualiza abas específicas
+                atualizar_abas_com_colunas_personalizadas(df, 'Tipo do requerimento', client, 'Relatórios PPG Geografia (Responses)')
+                registrar_alteracao(client, "Edição", valores)
+                
+                messagebox.showinfo("Salvo", "Dados atualizados com sucesso!")
+                editar_janela.destroy()
+            except IndexError:
+                messagebox.showerror("Erro", "Erro ao encontrar o índice do item selecionado.")
+
 
         tk.Button(editar_janela, text="Salvar Item", command=salvar_edicao, bg="#27AE60", fg="#ECF0F1").grid(row=len(valores), column=0, columnspan=2, pady=10)
 

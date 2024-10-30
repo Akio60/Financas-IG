@@ -17,7 +17,6 @@ def ler_aba(client, nome_planilha, nome_aba):
     data = sheet.get_all_records()
     return pd.DataFrame(data)
 
-
 def atualizar_abas_com_colunas_personalizadas(df, coluna_criterio, client, nome_planilha):
     """
     Atualiza abas no Google Sheets com dados da aba principal, separando por valor de uma coluna
@@ -74,7 +73,6 @@ def atualizar_abas_com_colunas_personalizadas(df, coluna_criterio, client, nome_
     for valor in valores_unicos:
         # Verifica se há colunas de interesse definidas para o valor
         colunas_interesse = colunas_interesse_dict.get(valor)
-        print(valor)
         if colunas_interesse is None:
             print(f"Não há colunas de interesse definidas para o valor '{valor}' na coluna critério.")
             continue
