@@ -1,8 +1,11 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, StringVar, OptionMenu
+from tkinter import ttk, messagebox, StringVar, OptionMenu, Text
 import gspread
 import pandas as pd
 from oauth2client.service_account import ServiceAccountCredentials
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Conectar com o Google Sheets usando gspread
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/spreadsheets",
@@ -31,7 +34,7 @@ all_columns = data.columns.tolist()
 
 # Lista de colunas a serem exibidas (edite esta lista para mostrar ou ocultar colunas)
 columns_to_display = [
-    'Carimbo de data/hora',  # Certifique-se de incluir o carimbo de data e hora
+#    'Carimbo de data/hora',  # Certifique-se de incluir o carimbo de data e hora
     'Status',
     'Nome completo (sem abreviações):',
     'Curso:',
@@ -175,8 +178,7 @@ class App:
                     timestamp_value = row_data['Carimbo de data/hora']
                     # Encontrar a linha que corresponde ao carimbo de data/hora
                     cell_list = sheet.col_values(column_indices['Carimbo de data/hora'])
-                    # Como o get_all_records pode ter convertido o timestamp, precisamos garantir que o formato corresponde
-                    for idx, cell_value in enumerate(cell_list[1:], start=2):  # Começa em 2 para pular o cabeçalho
+                    for idx, cell_value in enumerate(cell_list[1:], start=2):
                         if cell_value == timestamp_value:
                             row_number = idx
                             break
@@ -197,11 +199,58 @@ class App:
         edit_button.pack(pady=10)
 
         # Botão de envio de e-mail
-        def send_email():
-            # Implementar funcionalidade de envio de e-mail aqui
-            messagebox.showinfo("E-mail", "Função de envio de e-mail ainda não implementada.")
+        def send_email_window():
+            email_window = tk.Toplevel(details_window)
+            email_window.title("Enviar E-mail")
 
-        email_button = tk.Button(details_window, text="Enviar E-mail", command=send_email)
+            recipient_label = tk.Label(email_window, text="Destinatário:")
+            recipient_label.pack(anchor="w", padx=10, pady=5)
+            recipient_email = row_data['Endereço de e-mail']
+            recipient_entry = tk.Entry(email_window, width=50)
+            recipient_entry.insert(0, recipient_email)
+            recipient_entry.pack(anchor="w", padx=10, pady=5)
+
+            email_body_label = tk.Label(email_window, text="Corpo do E-mail:")
+            email_body_label.pack(anchor="w", padx=10, pady=5)
+            email_body_text = Text(email_window, width=60, height=15)
+            email_body = f"Olá {row_data['Nome completo (sem abreviações):']},\n\nSeu status atual é: {row_data['Status']}.\nCurso: {row_data['Curso:']}.\nOrientador: {row_data['Orientador']}.\n\nAtt,\nEquipe de Suporte"
+            email_body_text.insert(tk.END, email_body)
+            email_body_text.pack(anchor="w", padx=10, pady=5)
+
+            def send_email():
+                try:
+                    # Configurações do servidor SMTP (exemplo com Gmail)
+                    smtp_server = "smtp.gmail.com"
+                    smtp_port = 587
+                    sender_email = "financas.ig.nubia@gmail.com"
+                    sender_password = "unicamp123"
+
+                    recipient = recipient_entry.get()
+                    subject = "Atualização de Status"
+                    body = email_body_text.get("1.0", tk.END)
+
+                    msg = MIMEMultipart()
+                    msg['From'] = sender_email
+                    msg['To'] = recipient
+                    msg['Subject'] = subject
+                    msg.attach(MIMEText(body, 'plain'))
+
+                    # Enviar o e-mail
+                    server = smtplib.SMTP(smtp_server, smtp_port)
+                    server.starttls()
+                    server.login(sender_email, sender_password)
+                    server.sendmail(sender_email, recipient, msg.as_string())
+                    server.quit()
+
+                    messagebox.showinfo("Sucesso", "E-mail enviado com sucesso!")
+                    email_window.destroy()
+                except Exception as e:
+                    messagebox.showerror("Erro", f"Erro ao enviar o e-mail: {e}")
+
+            send_button = tk.Button(email_window, text="Enviar E-mail", command=send_email)
+            send_button.pack(pady=10)
+
+        email_button = tk.Button(details_window, text="Enviar E-mail", command=send_email_window)
         email_button.pack(pady=10)
 
 # Inicializar aplicação
