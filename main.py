@@ -223,7 +223,7 @@ class App:
                     smtp_server = "smtp.gmail.com"
                     smtp_port = 587
                     sender_email = "financas.ig.nubia@gmail.com"
-                    sender_password = "unicamp123"
+                    sender_password = "ldgb nlyb sjqn lffy"
 
                     recipient = recipient_entry.get()
                     subject = "Atualização de Status"
