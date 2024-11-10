@@ -6,6 +6,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from PIL import Image, ImageTk
 
 # Conectar com o Google Sheets usando gspread
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/spreadsheets",
@@ -40,17 +41,28 @@ columns_to_display = [
     'Curso:',
     'Orientador',
     'Possui bolsa?',
-    'Motivo da solicitação'
+    'Motivo da solicitação',
+    'Local de realização do evento'
 ]
 
 # Lista de colunas a serem exibidas na visualização dos detalhes
 detail_columns_to_display = [
-    'Carimbo de data/hora',
-    'Status',
     'Nome completo (sem abreviações):',
     'Curso:',
     'Orientador',
-    'Possui bolsa?'
+    'Possui bolsa?',
+    'Motivo da solicitação',
+    'Endereço de e-mail',
+    'Telefone',
+    'Data de nascimento',
+    'RG',
+    'CPF',
+    'Endereço completo',
+    'Cidade',
+    'Estado',
+    'CEP',
+    'Status',
+    'Local de realização do evento'
 ]
 
 # Se a lista estiver vazia, exibir todas as colunas
@@ -62,7 +74,7 @@ class App:
     def __init__(self, root):
         self.root = root
         root.title("Aplicativo de Visualização de Dados")
-        root.geometry("1000x600")
+        root.geometry("1000x700")
 
         # Frame principal para dividir a tela
         main_frame = tk.Frame(root)
@@ -71,6 +83,10 @@ class App:
         # Frame para os botões à esquerda
         button_frame = tk.Frame(main_frame, width=200, bg="lightgrey")
         button_frame.pack(side="left", fill="y")
+
+        # Título do aplicativo acima dos botões
+        title_label = tk.Label(button_frame, text="Lista de Status", font=("Helvetica", 14, "bold"), bg="lightgrey")
+        title_label.pack(pady=20, padx=10)
 
         # Botões de filtro
         self.status_options = [
@@ -89,9 +105,47 @@ class App:
         self.view_all_button = tk.Button(button_frame, text="Visualizar Todos os Dados", command=lambda: self.update_table())
         self.view_all_button.pack(pady=10, padx=10, fill="x")
 
+        # Frame para imagem e créditos na parte inferior
+        bottom_frame = tk.Frame(root, bg="lightgrey")
+        bottom_frame.pack(side="bottom", fill="x")
+
+        # Logo na parte inferior
+        try:
+            logo_image_bottom = Image.open("logo_unicamp.png")
+            logo_image_bottom = logo_image_bottom.resize((50, 50), Image.LANCZOS)
+            logo_photo_bottom = ImageTk.PhotoImage(logo_image_bottom)
+            logo_label_bottom = tk.Label(bottom_frame, image=logo_photo_bottom, bg="lightgrey")
+            logo_label_bottom.image = logo_photo_bottom
+            logo_label_bottom.pack(side="left", padx=10, pady=10)
+        except Exception as e:
+            logo_label_bottom = tk.Label(bottom_frame, text="Logo não encontrada", font=("Helvetica", 10, "italic"), bg="lightgrey")
+            logo_label_bottom.pack(side="left", padx=10, pady=10)
+
+        # Texto de créditos na parte inferior
+        credits_label = tk.Label(bottom_frame, text="Desenvolvido por: Vitor Akio & Leonardo Macedo", font=("Helvetica", 10), bg="lightgrey")
+        credits_label.pack(side="right", padx=10, pady=10)
+
         # Frame para a tabela à direita
         table_frame = tk.Frame(main_frame)
         table_frame.pack(side="right", fill="both", expand=True)
+
+        # Logo acima da tabela
+        logo_frame = tk.Frame(table_frame)
+        logo_frame.pack(side="top", pady=10)
+        try:
+            logo_image = Image.open("logo_ig.png")
+            logo_image = logo_image.resize((100, 100), Image.LANCZOS)
+            logo_photo = ImageTk.PhotoImage(logo_image)
+            logo_label = tk.Label(logo_frame, image=logo_photo)
+            logo_label.image = logo_photo
+            logo_label.pack()
+        except Exception as e:
+            logo_label = tk.Label(logo_frame, text="Logo não encontrada", font=("Helvetica", 10, "italic"))
+            logo_label.pack()
+
+        # Título da tabela
+        table_title_label = tk.Label(table_frame, text="Controle de Orçamento IG - PPG UNICAMP", font=("Helvetica", 16, "bold"))
+        table_title_label.pack(pady=10)
 
         # Treeview para exibir dados
         self.tree = ttk.Treeview(table_frame, columns=columns_to_display, show="headings")
@@ -223,7 +277,8 @@ class App:
                     smtp_server = "smtp.gmail.com"
                     smtp_port = 587
                     sender_email = "financas.ig.nubia@gmail.com"
-                    sender_password = "ldgb nlyb sjqn lffy"
+                    import os
+                    sender_password = 'upxu mpbq mbce mdti'
 
                     recipient = recipient_entry.get()
                     subject = "Atualização de Status"
@@ -254,6 +309,7 @@ class App:
         email_button.pack(pady=10)
 
 # Inicializar aplicação
+# Certifique-se de definir a variável de ambiente 'EMAIL_PASSWORD' antes de executar o aplicativo
 root = tk.Tk()
 app = App(root)
 root.mainloop()
