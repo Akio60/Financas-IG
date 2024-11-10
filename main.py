@@ -10,7 +10,7 @@ from email.mime.multipart import MIMEMultipart
 from PIL import Image, ImageTk  # Importar Pillow para manipulação de imagens
 
 # Carregar variável de ambiente para a senha do email
-os.environ['EMAIL_PASSWORD'] = 'upxu mpbq mbce mdti'  # Substitua 'senha' pela sua senha real ou configure a variável de ambiente
+os.environ['EMAIL_PASSWORD'] = 'senha'  # Substitua 'senha' pela sua senha real ou configure a variável de ambiente
 
 # Lista de colunas da planilha
 ALL_COLUMNS_detail = [
@@ -135,72 +135,92 @@ class App:
         self.selected_button = None  # Para rastrear o botão selecionado
         self.details_frame = None    # Inicializar self.details_frame como None
         self.current_view = None     # Para rastrear a visualização atual
+
+        # Definir cores base
+        self.bg_color = '#e0f0ff'        # Fundo azul claro
+        self.button_bg_color = '#add8e6'  # Botões azul
+        self.frame_bg_color = '#d0e0ff'   # Frames azul claro
+
+        # Definir cores para os status
+        self.status_colors = {
+            'Aguardando documentação': '#FFD700',  # Dourado
+            'Autorizado': '#32CD32',               # Verde limão
+            'Negado': '#FF6347',                   # Tomate
+            'Pronto para pagamento': '#1E90FF',    # Azul Dodger
+            'Pago': '#8A2BE2',                     # Azul Violeta
+            # Adicione outros status se necessário
+        }
+
         self.setup_ui()
-        # Remover a chamada para self.update_table() para não exibir a tabela ao iniciar
-        # self.update_table()
 
     def setup_ui(self):
-        self.root.title("Aplicativo de Visualização de Dados")
+        self.root.title("Controle de Orçamento IG - PPG UNICAMP")
         self.root.geometry("1000x700")
+        self.root.configure(bg=self.bg_color)
 
-        self.main_frame = tk.Frame(self.root)
+        self.main_frame = tk.Frame(self.root, bg=self.bg_color)
         self.main_frame.pack(fill="both", expand=True)
 
         # Frame esquerdo (painel de botões)
-        self.left_frame = tk.Frame(self.main_frame, width=200, bg="lightgrey")
+        self.left_frame = tk.Frame(self.main_frame, width=200, bg=self.frame_bg_color)
         self.left_frame.pack(side="left", fill="y")
 
-        title_label = tk.Label(self.left_frame, text="Lista de Status", font=("Helvetica", 14, "bold"), bg="lightgrey")
+        title_label = tk.Label(self.left_frame, text="Lista de Status", font=("Helvetica", 14, "bold"), bg=self.frame_bg_color)
         title_label.pack(pady=20, padx=10)
 
-        # Botões para visualizar pendências, pagos, dados vazios e todos os dados
-        self.empty_status_button = tk.Button(self.left_frame, text="Aguardando aprovação", command=lambda: self.select_view("Aguardando aprovação"))
-        self.empty_status_button.pack(pady=10, padx=10, fill="x")
-
-        self.pending_button = tk.Button(self.left_frame, text="Pendências", command=lambda: self.select_view("Pendências"))
-        self.pending_button.pack(pady=10, padx=10, fill="x")
-
-        self.paid_button = tk.Button(self.left_frame, text="Pago", command=lambda: self.select_view("Pago"))
-        self.paid_button.pack(pady=10, padx=10, fill="x")
-
-        self.ready_for_payment_button = tk.Button(self.left_frame, text="Pronto para pagamento", command=lambda: self.select_view("Pronto para pagamento"))
-        self.ready_for_payment_button.pack(pady=10, padx=10, fill="x")
-
-        self.view_all_button = tk.Button(self.left_frame, text="Visualização Completa", command=lambda: self.select_view("Todos"))
-        self.view_all_button.pack(pady=10, padx=10, fill="x")
-
         # Botão Página Inicial
-        self.home_button = tk.Button(self.left_frame, text="🏠 Página Inicial", command=self.go_to_home)
+        self.home_button = tk.Button(self.left_frame, text="🏠 Página Inicial", command=self.go_to_home, bg=self.button_bg_color)
         self.home_button.pack(pady=10, padx=10, fill="x")
 
-        bottom_frame = tk.Frame(self.root, bg="lightgrey")
+        # Botões de visualização
+        self.empty_status_button = tk.Button(self.left_frame, text="Aguardando aprovação", command=lambda: self.select_view("Aguardando aprovação"), bg=self.button_bg_color)
+        self.empty_status_button.pack(pady=10, padx=10, fill="x")
+
+        self.pending_button = tk.Button(self.left_frame, text="Pendências", command=lambda: self.select_view("Pendências"), bg=self.button_bg_color)
+        self.pending_button.pack(pady=10, padx=10, fill="x")
+
+        self.ready_for_payment_button = tk.Button(self.left_frame, text="Pronto para pagamento", command=lambda: self.select_view("Pronto para pagamento"), bg=self.button_bg_color)
+        self.ready_for_payment_button.pack(pady=10, padx=10, fill="x")
+
+        self.paid_button = tk.Button(self.left_frame, text="Pago", command=lambda: self.select_view("Pago"), bg=self.button_bg_color)
+        self.paid_button.pack(pady=10, padx=10, fill="x")
+
+        self.view_all_button = tk.Button(self.left_frame, text="Visualização Completa", command=lambda: self.select_view("Todos"), bg=self.button_bg_color)
+        self.view_all_button.pack(pady=10, padx=10, fill="x")
+
+        bottom_frame = tk.Frame(self.root, bg=self.bg_color)
         bottom_frame.pack(side="bottom", fill="x")
 
         credits_label = tk.Label(bottom_frame, text="Desenvolvido por: Vitor Akio & Leonardo Macedo",
-                                 font=("Helvetica", 10), bg="lightgrey")
+                                 font=("Helvetica", 10), bg=self.bg_color)
         credits_label.pack(side="right", padx=10, pady=10)
 
         # Frame direito (conteúdo principal)
-        self.content_frame = tk.Frame(self.main_frame)
+        self.content_frame = tk.Frame(self.main_frame, bg=self.bg_color)
         self.content_frame.pack(side="left", fill="both", expand=True)
 
         # Criar o welcome_frame para a tela inicial
-        self.welcome_frame = tk.Frame(self.content_frame)
+        self.welcome_frame = tk.Frame(self.content_frame, bg=self.bg_color)
         self.welcome_frame.pack(fill="both", expand=True)
 
         # Configurar a tela de boas-vindas
         self.setup_welcome_screen()
 
         # Frame da tabela dentro do content_frame (não empacotar agora)
-        self.table_frame = tk.Frame(self.content_frame)
+        self.table_frame = tk.Frame(self.content_frame, bg=self.bg_color)
         # self.table_frame.pack(fill="both", expand=True)  # Não empacotar agora
 
         self.table_title_label = tk.Label(self.table_frame, text="Controle de Orçamento IG - PPG UNICAMP",
-                                          font=("Helvetica", 16, "bold"))
+                                          font=("Helvetica", 16, "bold"), bg=self.bg_color)
         self.table_title_label.pack(pady=10)
 
         # Inicializar a Treeview
-        self.tree = ttk.Treeview(self.table_frame, show="headings")
+        style = ttk.Style()
+        style.theme_use("default")
+        style.configure("Treeview", background=self.bg_color, foreground="black", rowheight=25, fieldbackground=self.bg_color)
+        style.map('Treeview', background=[('selected', '#347083')])
+
+        self.tree = ttk.Treeview(self.table_frame, show="headings", style="Treeview")
         self.tree.pack(fill="both", expand=True)
 
         scrollbar = ttk.Scrollbar(self.table_frame, orient="vertical", command=self.tree.yview)
@@ -208,6 +228,10 @@ class App:
         scrollbar.pack(side="right", fill="y")
 
         self.tree.bind("<Double-1>", self.on_treeview_click)
+
+        # Definir tags para linhas ímpares e pares
+        self.tree.tag_configure('oddrow', background='#f0f8ff')   # AliceBlue
+        self.tree.tag_configure('evenrow', background='#ffffff')  # White
 
         # Botão "Voltar"
         self.back_button = tk.Button(
@@ -239,15 +263,15 @@ class App:
             return
 
         # Criar frames para as logos e texto
-        logos_frame = tk.Frame(self.welcome_frame)
+        logos_frame = tk.Frame(self.welcome_frame, bg=self.bg_color)
         logos_frame.pack(pady=20)
 
         # Exibir as logos lado a lado
-        ig_label = tk.Label(logos_frame, image=logo_ig)
+        ig_label = tk.Label(logos_frame, image=logo_ig, bg=self.bg_color)
         ig_label.image = logo_ig  # Manter referência
         ig_label.pack(side='left', padx=10)
 
-        unicamp_label = tk.Label(logos_frame, image=logo_unicamp)
+        unicamp_label = tk.Label(logos_frame, image=logo_unicamp, bg=self.bg_color)
         unicamp_label.image = logo_unicamp  # Manter referência
         unicamp_label.pack(side='left', padx=10)
 
@@ -258,7 +282,7 @@ class App:
             "as solicitações."
         )
 
-        summary_label = tk.Label(self.welcome_frame, text=summary_text, font=("Helvetica", 12), wraplength=600, justify='center')
+        summary_label = tk.Label(self.welcome_frame, text=summary_text, font=("Helvetica", 12), wraplength=600, justify='center', bg=self.bg_color)
         summary_label.pack(pady=20)
 
     def select_view(self, view_name):
@@ -289,7 +313,7 @@ class App:
     def update_selected_button(self, view_name):
         # Resetar a cor do botão previamente selecionado
         if self.selected_button:
-            self.selected_button.config(bg="SystemButtonFace")
+            self.selected_button.config(bg=self.button_bg_color)
 
         # Atualizar o botão selecionado e mudar sua cor
         if view_name == "Aguardando aprovação":
@@ -306,7 +330,7 @@ class App:
             self.selected_button = None
 
         if self.selected_button:
-            self.selected_button.config(bg="lightblue")
+            self.selected_button.config(bg="#87CEFA")  # Cor diferente para indicar seleção
 
     def go_to_home(self):
         # Ocultar outros frames
@@ -357,13 +381,17 @@ class App:
         self.tree["columns"] = self.columns_to_display
         for col in self.tree["columns"]:
             self.tree.heading(col, text=col)
-            self.tree.column(col, anchor="center")
+            self.tree.column(col, anchor="center", width=150)
 
         # Carregar os dados completos
         self.data = self.sheets_handler.load_data()
 
         # Converter 'Carimbo de data/hora' para datetime e formatar
-        self.data['Carimbo de data/hora'] = pd.to_datetime(self.data['Carimbo de data/hora'], errors='coerce')
+        self.data['Carimbo de data/hora'] = pd.to_datetime(
+            self.data['Carimbo de data/hora'],
+            format='%d/%m/%Y %H:%M:%S',
+            errors='coerce'
+        )
         self.data['Carimbo de data/hora'] = self.data['Carimbo de data/hora'].dt.strftime('%d/%m/%Y')
 
         # Aplicar o filtro de status no DataFrame completo
@@ -387,7 +415,14 @@ class App:
 
         # Inserir os dados na Treeview
         for idx, row in data_filtered.iterrows():
-            self.tree.insert("", "end", iid=idx, values=row.tolist())
+            values = row.tolist()
+            # Determinar a tag para cores alternadas
+            tag = 'evenrow' if idx % 2 == 0 else 'oddrow'
+            # Aplicar cor ao texto do status
+            status = row.get('Status', '')
+            status_color = self.status_colors.get(status, '#000000')  # Cor padrão preta
+            self.tree.tag_configure(str(idx), foreground=status_color)
+            self.tree.insert("", "end", iid=idx, values=values, tags=(tag, str(idx)))
 
         # Esconde o botão de voltar quando na visualização principal
         self.back_button.pack_forget()
@@ -405,12 +440,12 @@ class App:
         self.table_frame.pack_forget()
 
         # Mostrar os detalhes do item selecionado em abas
-        self.details_frame = tk.Frame(self.content_frame)
+        self.details_frame = tk.Frame(self.content_frame, bg=self.bg_color)
         self.details_frame.pack(fill="both", expand=True)
 
         # Adicionar o título na sessão de detalhes
         self.details_title_label = tk.Label(self.details_frame, text="Controle de Orçamento IG - PPG UNICAMP",
-                                            font=("Helvetica", 16, "bold"))
+                                            font=("Helvetica", 16, "bold"), bg=self.bg_color)
         self.details_title_label.pack(pady=10)
 
         self.detail_widgets = {}
@@ -499,7 +534,7 @@ class App:
                     if not new_value.strip():
                         messagebox.showwarning("Aviso", "Por favor, insira um valor antes de autorizar o auxílio.")
                         return
-                    new_status = 'Aguardando documentação'
+                    new_status = 'Aguardando documentação'  # Alterado aqui
                     self.sheets_handler.update_status(row_data['Carimbo de data/hora'], new_status)
                     self.sheets_handler.update_value(row_data['Carimbo de data/hora'], new_value)
                     self.ask_send_email(row_data, new_status, new_value)
@@ -555,6 +590,27 @@ class App:
 
             authorize_button = tk.Button(actions_tab, text="Autorizar Pagamento", command=authorize_payment, bg="green", fg="white", font=("Helvetica", 13))
             authorize_button.pack(pady=10)
+
+        elif self.current_view == "Pronto para pagamento":
+            # Criar a aba "Ações"
+            actions_tab = ttk.Frame(notebook)
+            notebook.add(actions_tab, text="Ações")
+
+            # Botão "Pagamento Efetuado"
+            def payment_made():
+                new_status = 'Pago'
+                self.sheets_handler.update_status(row_data['Carimbo de data/hora'], new_status)
+                subject = "Pagamento Efetuado"
+                body = f"Olá {row_data['Nome completo (sem abreviações):']},\n\n" \
+                       f"Seu pagamento foi efetuado com sucesso.\n\n" \
+                       f"Atenciosamente,\nEquipe Financeira"
+                self.send_custom_email(row_data['Endereço de e-mail'], subject, body)
+                # Atualizar tabela e voltar à visualização principal
+                self.update_table()
+                self.back_to_main_view()
+
+            payment_button = tk.Button(actions_tab, text="Pagamento Efetuado", command=payment_made, bg="green", fg="white", font=("Helvetica", 13))
+            payment_button.pack(pady=10)
 
         # Exibir o botão "Voltar" no final da sessão de detalhes
         self.back_button.pack(side='bottom', pady=20)
