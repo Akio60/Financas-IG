@@ -1,15 +1,16 @@
 import os
 import tkinter as tk
-from tkinter import ttk, messagebox, Text, Entry
+from tkinter import ttk, messagebox, Text
 import gspread
 import pandas as pd
 from oauth2client.service_account import ServiceAccountCredentials
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from PIL import Image, ImageTk  # Importar Pillow para manipulação de imagens
 
 # Carregar variável de ambiente para a senha do email
-os.environ['EMAIL_PASSWORD'] = 'senha'
+os.environ['EMAIL_PASSWORD'] = 'upxu mpbq mbce mdti'  # Substitua 'senha' pela sua senha real ou configure a variável de ambiente
 
 # Lista de colunas da planilha
 ALL_COLUMNS_detail = [
@@ -36,7 +37,7 @@ ALL_COLUMNS = [
     'Dados bancários (banco, agência e conta) '
 ]
 
-# Google Sheets Handler
+# Classe para manipular o Google Sheets
 class GoogleSheetsHandler:
     def __init__(self, credentials_file, sheet_url):
         scope = [
@@ -83,7 +84,7 @@ class GoogleSheetsHandler:
                     return True
         return False
 
-# Email Sender
+# Classe para enviar e-mails
 class EmailSender:
     def __init__(self, smtp_server, smtp_port, sender_email):
         self.smtp_server = smtp_server
@@ -110,7 +111,7 @@ class EmailSender:
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao enviar o e-mail: {e}")
 
-# Main Application Class
+# Classe principal da aplicação
 class App:
     def __init__(self, root, sheets_handler, email_sender):
         self.root = root
@@ -118,6 +119,7 @@ class App:
         self.email_sender = email_sender
         self.data = self.sheets_handler.load_data()
         self.columns_to_display_base = [
+            'Carimbo de data/hora',
             'Status',
             'Nome completo (sem abreviações):',
             'Curso:',
@@ -128,13 +130,14 @@ class App:
         ]
         self.detail_columns_to_display = ALL_COLUMNS_detail.copy()
         self.columns_to_display = self.columns_to_display_base.copy()
-        self.main_frame = None
-        self.details_frame = None
         self.detail_widgets = {}
         self.current_row_data = None
         self.selected_button = None  # Para rastrear o botão selecionado
+        self.details_frame = None    # Inicializar self.details_frame como None
+        self.current_view = None     # Para rastrear a visualização atual
         self.setup_ui()
-        self.update_table()
+        # Remover a chamada para self.update_table() para não exibir a tabela ao iniciar
+        # self.update_table()
 
     def setup_ui(self):
         self.root.title("Aplicativo de Visualização de Dados")
@@ -143,24 +146,32 @@ class App:
         self.main_frame = tk.Frame(self.root)
         self.main_frame.pack(fill="both", expand=True)
 
-        button_frame = tk.Frame(self.main_frame, width=200, bg="lightgrey")
-        button_frame.pack(side="left", fill="y")
+        # Frame esquerdo (painel de botões)
+        self.left_frame = tk.Frame(self.main_frame, width=200, bg="lightgrey")
+        self.left_frame.pack(side="left", fill="y")
 
-        title_label = tk.Label(button_frame, text="Lista de Status", font=("Helvetica", 14, "bold"), bg="lightgrey")
+        title_label = tk.Label(self.left_frame, text="Lista de Status", font=("Helvetica", 14, "bold"), bg="lightgrey")
         title_label.pack(pady=20, padx=10)
 
         # Botões para visualizar pendências, pagos, dados vazios e todos os dados
-        self.empty_status_button = tk.Button(button_frame, text="Status Vazio", command=lambda: self.select_view("Vazio"))
+        self.empty_status_button = tk.Button(self.left_frame, text="Aguardando aprovação", command=lambda: self.select_view("Aguardando aprovação"))
         self.empty_status_button.pack(pady=10, padx=10, fill="x")
 
-        self.pending_button = tk.Button(button_frame, text="Pendências", command=lambda: self.select_view("Pendências"))
+        self.pending_button = tk.Button(self.left_frame, text="Pendências", command=lambda: self.select_view("Pendências"))
         self.pending_button.pack(pady=10, padx=10, fill="x")
 
-        self.paid_button = tk.Button(button_frame, text="Pago", command=lambda: self.select_view("Pago"))
+        self.paid_button = tk.Button(self.left_frame, text="Pago", command=lambda: self.select_view("Pago"))
         self.paid_button.pack(pady=10, padx=10, fill="x")
 
-        self.view_all_button = tk.Button(button_frame, text="Visualização Completa", command=lambda: self.select_view("Todos"))
+        self.ready_for_payment_button = tk.Button(self.left_frame, text="Pronto para pagamento", command=lambda: self.select_view("Pronto para pagamento"))
+        self.ready_for_payment_button.pack(pady=10, padx=10, fill="x")
+
+        self.view_all_button = tk.Button(self.left_frame, text="Visualização Completa", command=lambda: self.select_view("Todos"))
         self.view_all_button.pack(pady=10, padx=10, fill="x")
+
+        # Botão Página Inicial
+        self.home_button = tk.Button(self.left_frame, text="🏠 Página Inicial", command=self.go_to_home)
+        self.home_button.pack(pady=10, padx=10, fill="x")
 
         bottom_frame = tk.Frame(self.root, bg="lightgrey")
         bottom_frame.pack(side="bottom", fill="x")
@@ -169,27 +180,38 @@ class App:
                                  font=("Helvetica", 10), bg="lightgrey")
         credits_label.pack(side="right", padx=10, pady=10)
 
-        table_frame = tk.Frame(self.main_frame)
-        table_frame.pack(side="right", fill="both", expand=True)
+        # Frame direito (conteúdo principal)
+        self.content_frame = tk.Frame(self.main_frame)
+        self.content_frame.pack(side="left", fill="both", expand=True)
 
-        self.table_title_label = tk.Label(table_frame, text="Controle de Orçamento IG - PPG UNICAMP",
+        # Criar o welcome_frame para a tela inicial
+        self.welcome_frame = tk.Frame(self.content_frame)
+        self.welcome_frame.pack(fill="both", expand=True)
+
+        # Configurar a tela de boas-vindas
+        self.setup_welcome_screen()
+
+        # Frame da tabela dentro do content_frame (não empacotar agora)
+        self.table_frame = tk.Frame(self.content_frame)
+        # self.table_frame.pack(fill="both", expand=True)  # Não empacotar agora
+
+        self.table_title_label = tk.Label(self.table_frame, text="Controle de Orçamento IG - PPG UNICAMP",
                                           font=("Helvetica", 16, "bold"))
         self.table_title_label.pack(pady=10)
 
-        # Inicializar a Treeview sem definir as colunas aqui
-        self.tree = ttk.Treeview(table_frame, show="headings")
+        # Inicializar a Treeview
+        self.tree = ttk.Treeview(self.table_frame, show="headings")
         self.tree.pack(fill="both", expand=True)
 
-        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
+        scrollbar = ttk.Scrollbar(self.table_frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscroll=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
 
         self.tree.bind("<Double-1>", self.on_treeview_click)
 
         # Botão "Voltar"
-        # Aumentar o tamanho da fonte e ajustar largura e altura
         self.back_button = tk.Button(
-            self.root,
+            self.content_frame,
             text="Voltar",
             command=self.back_to_main_view,
             bg="darkgrey",
@@ -199,14 +221,65 @@ class App:
             height=2   # Aumentar a altura do botão
         )
 
+    def setup_welcome_screen(self):
+        # Carregar as imagens e redimensioná-las
+        try:
+            img_ig = Image.open('logo_ig.png')
+            img_unicamp = Image.open('logo_unicamp.png')
+
+            # Redimensionar as imagens para um tamanho adequado
+            img_ig = img_ig.resize((100, 100), Image.LANCZOS)
+            img_unicamp = img_unicamp.resize((100, 100), Image.LANCZOS)
+
+            # Converter as imagens para PhotoImage
+            logo_ig = ImageTk.PhotoImage(img_ig)
+            logo_unicamp = ImageTk.PhotoImage(img_unicamp)
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao carregar as imagens: {e}")
+            return
+
+        # Criar frames para as logos e texto
+        logos_frame = tk.Frame(self.welcome_frame)
+        logos_frame.pack(pady=20)
+
+        # Exibir as logos lado a lado
+        ig_label = tk.Label(logos_frame, image=logo_ig)
+        ig_label.image = logo_ig  # Manter referência
+        ig_label.pack(side='left', padx=10)
+
+        unicamp_label = tk.Label(logos_frame, image=logo_unicamp)
+        unicamp_label.image = logo_unicamp  # Manter referência
+        unicamp_label.pack(side='left', padx=10)
+
+        # Texto resumindo o programa
+        summary_text = (
+            "Este aplicativo permite a visualização e gerenciamento das solicitações de auxílio financeiro "
+            "do Programa de Pós-Graduação do IG - UNICAMP. Utilize os botões ao lado para filtrar e visualizar "
+            "as solicitações."
+        )
+
+        summary_label = tk.Label(self.welcome_frame, text=summary_text, font=("Helvetica", 12), wraplength=600, justify='center')
+        summary_label.pack(pady=20)
+
     def select_view(self, view_name):
+        self.current_view = view_name  # Adicionado para rastrear a visualização atual
+        # Ocultar o welcome_frame se estiver visível
+        if self.welcome_frame:
+            self.welcome_frame.pack_forget()
+
+        # Certificar-se de que o table_frame está visível
+        if not self.table_frame.winfo_ismapped():
+            self.table_frame.pack(fill="both", expand=True)
+
         # Atualiza a tabela com o filtro selecionado
-        if view_name == "Vazio":
+        if view_name == "Aguardando aprovação":
             status_filter = "Vazio"
         elif view_name == "Pendências":
             status_filter = "Pendências"
         elif view_name == "Pago":
             status_filter = "Pago"
+        elif view_name == "Pronto para pagamento":
+            status_filter = "Pronto para pagamento"
         else:
             status_filter = None  # Visualização Completa
 
@@ -219,29 +292,56 @@ class App:
             self.selected_button.config(bg="SystemButtonFace")
 
         # Atualizar o botão selecionado e mudar sua cor
-        if view_name == "Vazio":
+        if view_name == "Aguardando aprovação":
             self.selected_button = self.empty_status_button
         elif view_name == "Pendências":
             self.selected_button = self.pending_button
         elif view_name == "Pago":
             self.selected_button = self.paid_button
-        else:
+        elif view_name == "Pronto para pagamento":
+            self.selected_button = self.ready_for_payment_button
+        elif view_name == "Todos":
             self.selected_button = self.view_all_button
+        else:
+            self.selected_button = None
 
-        self.selected_button.config(bg="lightblue")
+        if self.selected_button:
+            self.selected_button.config(bg="lightblue")
+
+    def go_to_home(self):
+        # Ocultar outros frames
+        if self.table_frame.winfo_ismapped():
+            self.table_frame.pack_forget()
+        if self.details_frame and self.details_frame.winfo_ismapped():
+            self.details_frame.pack_forget()
+            self.details_frame.destroy()
+            self.details_frame = None
+        # Mostrar o welcome_frame
+        self.welcome_frame.pack(fill="both", expand=True)
+        # Resetar o botão selecionado
+        self.update_selected_button(None)
 
     def back_to_main_view(self):
         # Oculta a visualização detalhada e exibe a principal
-        self.details_frame.pack_forget()
-        self.main_frame.pack(fill="both", expand=True)
-        self.back_button.pack_forget()
-        self.update_table()
-
-    def update_table(self, status_filter=None):
-        # Certificar-se de que a main_frame está visível
-        self.main_frame.pack(fill="both", expand=True)
         if self.details_frame:
             self.details_frame.pack_forget()
+            self.details_frame.destroy()
+            self.details_frame = None
+
+        # Esconder o botão "Voltar"
+        self.back_button.pack_forget()
+
+        # Mostrar o frame da tabela
+        self.table_frame.pack(fill="both", expand=True)
+
+    def update_table(self, status_filter=None):
+        # Certificar-se de que o frame da tabela está visível
+        if self.details_frame:
+            self.details_frame.pack_forget()
+            self.details_frame.destroy()
+            self.details_frame = None
+        self.table_frame.pack(fill="both", expand=True)
+
         for item in self.tree.get_children():
             self.tree.delete(item)
 
@@ -251,7 +351,7 @@ class App:
             if 'Status' in self.columns_to_display:
                 self.columns_to_display.remove('Status')
         elif 'Status' not in self.columns_to_display:
-            self.columns_to_display.insert(0, 'Status')  # Reinsere 'Status' na primeira posição
+            self.columns_to_display.insert(1, 'Status')  # Reinsere 'Status' na segunda posição
 
         # Atualizar as colunas da Treeview
         self.tree["columns"] = self.columns_to_display
@@ -262,13 +362,19 @@ class App:
         # Carregar os dados completos
         self.data = self.sheets_handler.load_data()
 
+        # Converter 'Carimbo de data/hora' para datetime e formatar
+        self.data['Carimbo de data/hora'] = pd.to_datetime(self.data['Carimbo de data/hora'], errors='coerce')
+        self.data['Carimbo de data/hora'] = self.data['Carimbo de data/hora'].dt.strftime('%d/%m/%Y')
+
         # Aplicar o filtro de status no DataFrame completo
         if status_filter == "Pendências":
-            data_filtered = self.data[self.data['Status'] != 'Pago']
+            data_filtered = self.data[(self.data['Status'] != 'Pago') & (self.data['Status'] != '')]
         elif status_filter == "Vazio":
             data_filtered = self.data[self.data['Status'] == '']
         elif status_filter == "Pago":
             data_filtered = self.data[self.data['Status'] == 'Pago']
+        elif status_filter == "Pronto para pagamento":
+            data_filtered = self.data[self.data['Status'] == 'Pronto para pagamento']
         else:
             data_filtered = self.data.copy()  # Sem filtro específico
 
@@ -283,7 +389,8 @@ class App:
         for idx, row in data_filtered.iterrows():
             self.tree.insert("", "end", iid=idx, values=row.tolist())
 
-        self.back_button.pack_forget()  # Esconde o botão de voltar quando na visualização principal
+        # Esconde o botão de voltar quando na visualização principal
+        self.back_button.pack_forget()
         self.table_title_label.config(text="Controle de Orçamento IG - PPG UNICAMP")
 
     def on_treeview_click(self, event):
@@ -294,18 +401,19 @@ class App:
             self.show_details_in_place(self.current_row_data)
 
     def show_details_in_place(self, row_data):
-        # Ocultar a visualização principal
-        self.main_frame.pack_forget()
+        # Ocultar o frame da tabela
+        self.table_frame.pack_forget()
 
         # Mostrar os detalhes do item selecionado em abas
-        self.details_frame = tk.Frame(self.root)
+        self.details_frame = tk.Frame(self.content_frame)
         self.details_frame.pack(fill="both", expand=True)
 
-        self.detail_widgets = {}
+        # Adicionar o título na sessão de detalhes
+        self.details_title_label = tk.Label(self.details_frame, text="Controle de Orçamento IG - PPG UNICAMP",
+                                            font=("Helvetica", 16, "bold"))
+        self.details_title_label.pack(pady=10)
 
-        # Criar um Notebook (interface de abas)
-        notebook = ttk.Notebook(self.details_frame)
-        notebook.pack(fill='both', expand=True)
+        self.detail_widgets = {}
 
         # Definir estilos
         label_style = ttk.Style()
@@ -313,6 +421,20 @@ class App:
 
         value_style = ttk.Style()
         value_style.configure("Regular.TLabel", font=("Helvetica", 12))
+
+        # Estilo para as abas do Notebook com tamanho aumentado
+        notebook_style = ttk.Style()
+        notebook_style.theme_use('default')
+
+        # Copiar o layout existente do TNotebook para o novo estilo
+        notebook_style.layout("CustomNotebook.TNotebook", notebook_style.layout("TNotebook"))
+
+        # Configurar o novo estilo das abas
+        notebook_style.configure("CustomNotebook.TNotebook.Tab", font=("Helvetica", 13))
+
+        # Criar um Notebook (interface de abas) com estilo personalizado
+        notebook = ttk.Notebook(self.details_frame, style="CustomNotebook.TNotebook")
+        notebook.pack(fill='both', expand=True)
 
         # Agrupar campos em seções
         sections = {
@@ -360,32 +482,24 @@ class App:
                     self.detail_widgets[col] = {'label': label, 'value': value, 'tab_frame': tab_frame}
                     row_idx += 1
 
-        # Botões no final
-        button_frame = ttk.Frame(self.details_frame)
-        button_frame.pack(side='bottom', pady=10)
-
-        # Adicionar botões específicos para a visualização 'Status Vazio'
-        if row_data['Status'] == '':
-            # Entry para "Valor" na aba "Informações Financeiras"
-            financial_tab = None
-            for child in notebook.winfo_children():
-                if notebook.tab(child, "text") == "Informações Financeiras":
-                    financial_tab = child
-                    break
-
-            if financial_tab:
-                row_idx = len(sections['Informações Financeiras'])
-                value_label = ttk.Label(financial_tab, text="Valor (R$):", style="Bold.TLabel")
+            # Adicionar campos e botões específicos na aba "Informações Financeiras" se o status estiver vazio
+            if section_name == "Informações Financeiras" and row_data['Status'] == '':
+                # Entry para "Valor (R$)"
+                value_label = ttk.Label(tab_frame, text="Valor (R$):", style="Bold.TLabel")
                 value_label.grid(row=row_idx, column=0, sticky='w', padx=10, pady=5)
-                value_entry = ttk.Entry(financial_tab, width=50)
+                value_entry = ttk.Entry(tab_frame, width=50)
                 value_entry.grid(row=row_idx, column=1, sticky='w', padx=10, pady=5)
-
-                # Salvar o widget value_entry para uso posterior
                 self.value_entry = value_entry
 
+                row_idx += 1  # Próxima linha para os botões
+
+                # Funções para os botões
                 def autorizar_auxilio():
-                    new_status = 'Autorizado'
                     new_value = self.value_entry.get()
+                    if not new_value.strip():
+                        messagebox.showwarning("Aviso", "Por favor, insira um valor antes de autorizar o auxílio.")
+                        return
+                    new_status = 'Aguardando documentação'
                     self.sheets_handler.update_status(row_data['Carimbo de data/hora'], new_status)
                     self.sheets_handler.update_value(row_data['Carimbo de data/hora'], new_value)
                     self.ask_send_email(row_data, new_status, new_value)
@@ -399,16 +513,51 @@ class App:
                     self.update_table()
                     self.back_to_main_view()
 
-                # Botões de ação
-                autorizar_button = ttk.Button(button_frame, text="Autorizar Auxílio", command=autorizar_auxilio)
-                autorizar_button.pack(side="left", padx=10)
+                # Criar botões usando tk.Button
+                autorizar_button = tk.Button(tab_frame, text="Autorizar Auxílio", command=autorizar_auxilio,
+                                             bg="green", fg="white", font=("Helvetica", 13))
+                negar_button = tk.Button(tab_frame, text="Negar Auxílio", command=negar_auxilio,
+                                         bg="red", fg="white", font=("Helvetica", 13))
 
-                negar_button = ttk.Button(button_frame, text="Negar Auxílio", command=negar_auxilio)
-                negar_button.pack(side="left", padx=10)
+                # Posicionar os botões abaixo do campo "Valor (R$)"
+                autorizar_button.grid(row=row_idx, column=0, padx=10, pady=10, sticky='w')
+                negar_button.grid(row=row_idx, column=1, padx=10, pady=10, sticky='w')
 
-        # Exibir o botão "Voltar" centralizado e com tamanho aumentado
-        self.back_button.pack(side="bottom", pady=20)
-        self.back_button.place(relx=0.5, rely=1.0, anchor='s')
+        # Adicionar a aba "Ações" se estiver na visualização de Pendências
+        if self.current_view == "Pendências":
+            # Criar a aba "Ações"
+            actions_tab = ttk.Frame(notebook)
+            notebook.add(actions_tab, text="Ações")
+
+            # Botão "Requerir Documentos"
+            def request_documents():
+                subject = "Requisição de Documentos"
+                body = f"Olá {row_data['Nome completo (sem abreviações):']},\n\n" \
+                       f"Precisamos que você envie os documentos X, Y e Z para prosseguirmos com sua solicitação.\n\n" \
+                       f"Atenciosamente,\nEquipe Financeira"
+                self.send_custom_email(row_data['Endereço de e-mail'], subject, body)
+
+            request_button = tk.Button(actions_tab, text="Requerir Documentos", command=request_documents, bg="orange", fg="white", font=("Helvetica", 13))
+            request_button.pack(pady=10)
+
+            # Botão "Autorizar Pagamento"
+            def authorize_payment():
+                new_status = 'Pronto para pagamento'
+                self.sheets_handler.update_status(row_data['Carimbo de data/hora'], new_status)
+                subject = "Pagamento Autorizado"
+                body = f"Olá {row_data['Nome completo (sem abreviações):']},\n\n" \
+                       f"Seu pagamento foi autorizado e está pronto para ser processado.\n\n" \
+                       f"Atenciosamente,\nEquipe Financeira"
+                self.send_custom_email(row_data['Endereço de e-mail'], subject, body)
+                # Atualizar tabela e voltar à visualização principal
+                self.update_table()
+                self.back_to_main_view()
+
+            authorize_button = tk.Button(actions_tab, text="Autorizar Pagamento", command=authorize_payment, bg="green", fg="white", font=("Helvetica", 13))
+            authorize_button.pack(pady=10)
+
+        # Exibir o botão "Voltar" no final da sessão de detalhes
+        self.back_button.pack(side='bottom', pady=20)
 
     def ask_send_email(self, row_data, new_status, new_value=None):
         send_email = messagebox.askyesno("Enviar E-mail", "Deseja enviar um e-mail notificando a alteração de status?")
@@ -442,6 +591,31 @@ class App:
 
             send_button = tk.Button(email_window, text="Enviar E-mail", command=send_email)
             send_button.pack(pady=10)
+
+    def send_custom_email(self, recipient, subject, body):
+        email_window = tk.Toplevel(self.root)
+        email_window.title("Enviar E-mail")
+
+        recipient_label = tk.Label(email_window, text="Destinatário:")
+        recipient_label.pack(anchor="w", padx=10, pady=5)
+        recipient_entry = tk.Entry(email_window, width=50)
+        recipient_entry.insert(0, recipient)
+        recipient_entry.pack(anchor="w", padx=10, pady=5)
+
+        email_body_label = tk.Label(email_window, text="Corpo do E-mail:")
+        email_body_label.pack(anchor="w", padx=10, pady=5)
+        email_body_text = Text(email_window, width=60, height=15)
+        email_body_text.insert(tk.END, body)
+        email_body_text.pack(anchor="w", padx=10, pady=5)
+
+        def send_email():
+            recipient_addr = recipient_entry.get()
+            email_body = email_body_text.get("1.0", tk.END)
+            self.email_sender.send_email(recipient_addr, subject, email_body)
+            email_window.destroy()
+
+        send_button = tk.Button(email_window, text="Enviar E-mail", command=send_email)
+        send_button.pack(pady=10)
 
 # Inicializar aplicação
 if __name__ == "__main__":
