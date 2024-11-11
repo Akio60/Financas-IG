@@ -7,7 +7,8 @@ from oauth2client.service_account import ServiceAccountCredentials
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from PIL import Image, ImageTk  # Importar Pillow para manipulação de imagens
+from PIL import Image, ImageTk
+from datetime import datetime
 
 # Carregar variável de ambiente para a senha do email
 os.environ['EMAIL_PASSWORD'] = 'senha'  # Substitua 'senha' pela sua senha real ou configure a variável de ambiente
@@ -61,6 +62,9 @@ class GoogleSheetsHandler:
             if cell_value == timestamp_value:
                 row_number = idx
                 self.sheet.update_cell(row_number, self.column_indices['Status'], new_status)
+                # Atualizar a coluna 'Ultima Atualizacao' com o timestamp atual
+                current_timestamp = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+                self.sheet.update_cell(row_number, self.column_indices['Ultima Atualizacao'], current_timestamp)
                 return True
         return False
 
@@ -118,18 +122,8 @@ class App:
         self.sheets_handler = sheets_handler
         self.email_sender = email_sender
         self.data = self.sheets_handler.load_data()
-        self.columns_to_display_base = [
-            'Carimbo de data/hora',
-            'Status',
-            'Nome completo (sem abreviações):',
-            'Curso:',
-            'Orientador',
-            'Possui bolsa?',
-            'Motivo da solicitação',
-            'Local de realização do evento'
-        ]
         self.detail_columns_to_display = ALL_COLUMNS_detail.copy()
-        self.columns_to_display = self.columns_to_display_base.copy()
+        self.columns_to_display = []  # Será definido em cada visualização
         self.detail_widgets = {}
         self.current_row_data = None
         self.selected_button = None  # Para rastrear o botão selecionado
@@ -148,7 +142,14 @@ class App:
             'Negado': '#FF6347',                   # Tomate
             'Pronto para pagamento': '#1E90FF',    # Azul Dodger
             'Pago': '#8A2BE2',                     # Azul Violeta
+            'Cancelado': '#A9A9A9',                # Cinza Escuro
             # Adicione outros status se necessário
+        }
+
+        # Mapeamento de nomes de colunas para exibição
+        self.column_display_names = {
+            'Carimbo de data/hora': 'Data do requerimento',
+            # Adicione outros mapeamentos se necessário
         }
 
         self.setup_ui()
@@ -185,6 +186,10 @@ class App:
         self.paid_button = tk.Button(self.left_frame, text="Pago", command=lambda: self.select_view("Pago"), bg=self.button_bg_color)
         self.paid_button.pack(pady=10, padx=10, fill="x")
 
+        # Botão para 'Cancelado'
+        self.cancelled_button = tk.Button(self.left_frame, text="Cancelado", command=lambda: self.select_view("Cancelado"), bg=self.button_bg_color)
+        self.cancelled_button.pack(pady=10, padx=10, fill="x")
+
         self.view_all_button = tk.Button(self.left_frame, text="Visualização Completa", command=lambda: self.select_view("Todos"), bg=self.button_bg_color)
         self.view_all_button.pack(pady=10, padx=10, fill="x")
 
@@ -208,7 +213,6 @@ class App:
 
         # Frame da tabela dentro do content_frame (não empacotar agora)
         self.table_frame = tk.Frame(self.content_frame, bg=self.bg_color)
-        # self.table_frame.pack(fill="both", expand=True)  # Não empacotar agora
 
         self.table_title_label = tk.Label(self.table_frame, text="Controle de Orçamento IG - PPG UNICAMP",
                                           font=("Helvetica", 16, "bold"), bg=self.bg_color)
@@ -238,11 +242,11 @@ class App:
             self.content_frame,
             text="Voltar",
             command=self.back_to_main_view,
-            bg="darkgrey",
+            bg=self.button_bg_color,
             fg="white",
-            font=("Helvetica", 16, "bold"),  # Aumentar o tamanho da fonte
-            width=20,  # Aumentar a largura do botão
-            height=2   # Aumentar a altura do botão
+            font=("Helvetica", 16, "bold"),
+            width=20,
+            height=2
         )
 
     def setup_welcome_screen(self):
@@ -304,6 +308,8 @@ class App:
             status_filter = "Pago"
         elif view_name == "Pronto para pagamento":
             status_filter = "Pronto para pagamento"
+        elif view_name == "Cancelado":
+            status_filter = "Cancelado"
         else:
             status_filter = None  # Visualização Completa
 
@@ -324,6 +330,8 @@ class App:
             self.selected_button = self.paid_button
         elif view_name == "Pronto para pagamento":
             self.selected_button = self.ready_for_payment_button
+        elif view_name == "Cancelado":
+            self.selected_button = self.cancelled_button
         elif view_name == "Todos":
             self.selected_button = self.view_all_button
         else:
@@ -369,18 +377,41 @@ class App:
         for item in self.tree.get_children():
             self.tree.delete(item)
 
-        # Atualizar a lista de colunas com base no filtro
-        self.columns_to_display = self.columns_to_display_base.copy()
-        if status_filter == "Vazio":
-            if 'Status' in self.columns_to_display:
-                self.columns_to_display.remove('Status')
-        elif 'Status' not in self.columns_to_display:
-            self.columns_to_display.insert(1, 'Status')  # Reinsere 'Status' na segunda posição
+        # Definir as colunas a serem exibidas com base na visualização atual
+        if self.current_view == "Aguardando aprovação":
+            self.columns_to_display = [
+                'Endereço de e-mail', 'Nome completo (sem abreviações):', 'Curso:', 'Orientador', 'Qual a agência de fomento?',
+                'Título do projeto do qual participa:', 'Motivo da solicitação',
+                'Local de realização do evento', 'Período de realização da atividade. Indique as datas (dd/mm/aaaa)',
+                'Telefone de contato:'
+            ]
+        elif self.current_view == "Pendências":
+            self.columns_to_display = [
+                'Carimbo de data/hora', 'Status', 'Nome completo (sem abreviações):', 'Ultima Atualizacao', 'Valor', 'Curso:', 'Orientador', 'E-mail DAC:'
+            ]
+        elif self.current_view == "Pronto para pagamento":
+            self.columns_to_display = [
+                'Carimbo de data/hora', 'Nome completo (sem abreviações):', 'Ultima Atualizacao', 'Valor', 'Telefone de contato:', 'E-mail DAC:',
+                'Endereço completo (logradouro, número, bairro, cidade e estado)', 'CPF:', 'RG/RNE:', 'Dados bancários (banco, agência e conta) '
+            ]
+        elif self.current_view == "Pago":
+            self.columns_to_display = [
+                'Carimbo de data/hora', 'Nome completo (sem abreviações):', 'Ultima Atualizacao', 'Valor', 'Status'
+            ]
+        elif self.current_view == "Cancelado":
+            self.columns_to_display = [
+                'Carimbo de data/hora', 'Nome completo (sem abreviações):', 'Ultima Atualizacao', 'Valor', 'Status'
+            ]
+        else:  # Visualização completa
+            self.columns_to_display = [
+                'Carimbo de data/hora', 'Nome completo (sem abreviações):', 'Ultima Atualizacao', 'Valor', 'Status'
+            ]
 
         # Atualizar as colunas da Treeview
         self.tree["columns"] = self.columns_to_display
         for col in self.tree["columns"]:
-            self.tree.heading(col, text=col)
+            display_name = self.column_display_names.get(col, col)
+            self.tree.heading(col, text=display_name)
             self.tree.column(col, anchor="center", width=150)
 
         # Carregar os dados completos
@@ -396,13 +427,24 @@ class App:
 
         # Aplicar o filtro de status no DataFrame completo
         if status_filter == "Pendências":
-            data_filtered = self.data[(self.data['Status'] != 'Pago') & (self.data['Status'] != '')]
+            data_filtered = self.data[
+                (self.data['Status'] != 'Pago') &
+                (self.data['Status'] != '') &
+                (self.data['Status'] != 'Cancelado') &
+                (self.data['Status'] != 'Negado')&
+                (self.data['Status'] != 'Pronto para pagamento')
+            ]
         elif status_filter == "Vazio":
             data_filtered = self.data[self.data['Status'] == '']
         elif status_filter == "Pago":
             data_filtered = self.data[self.data['Status'] == 'Pago']
         elif status_filter == "Pronto para pagamento":
             data_filtered = self.data[self.data['Status'] == 'Pronto para pagamento']
+        elif status_filter == "Cancelado":
+            data_filtered = self.data[
+                (self.data['Status'] == 'Cancelado') &
+                (self.data['Status'] != 'Negado')
+            ]
         else:
             data_filtered = self.data.copy()  # Sem filtro específico
 
@@ -418,11 +460,17 @@ class App:
             values = row.tolist()
             # Determinar a tag para cores alternadas
             tag = 'evenrow' if idx % 2 == 0 else 'oddrow'
-            # Aplicar cor ao texto do status
-            status = row.get('Status', '')
-            status_color = self.status_colors.get(status, '#000000')  # Cor padrão preta
-            self.tree.tag_configure(str(idx), foreground=status_color)
-            self.tree.insert("", "end", iid=idx, values=values, tags=(tag, str(idx)))
+            # Inserir o item
+            self.tree.insert("", "end", iid=idx, values=values, tags=(tag,))
+            # Colorir o texto da célula 'Status' se existir
+            if 'Status' in self.columns_to_display:
+                status_index = self.columns_to_display.index('Status')
+                status_value = row['Status']
+                status_color = self.status_colors.get(status_value, '#000000')  # Cor padrão preta
+                item_id = self.tree.get_children()[-1]  # Último item inserido
+                # Alterar a cor do texto da célula 'Status'
+                self.tree.tag_configure(f'status_{idx}', foreground=status_color)
+                self.tree.item(item_id, tags=(tag, f'status_{idx}'))
 
         # Esconde o botão de voltar quando na visualização principal
         self.back_button.pack_forget()
@@ -450,22 +498,19 @@ class App:
 
         self.detail_widgets = {}
 
-        # Definir estilos
-        label_style = ttk.Style()
-        label_style.configure("Bold.TLabel", font=("Helvetica", 12, "bold"))
-
-        value_style = ttk.Style()
-        value_style.configure("Regular.TLabel", font=("Helvetica", 12))
-
         # Estilo para as abas do Notebook com tamanho aumentado
         notebook_style = ttk.Style()
         notebook_style.theme_use('default')
 
-        # Copiar o layout existente do TNotebook para o novo estilo
-        notebook_style.layout("CustomNotebook.TNotebook", notebook_style.layout("TNotebook"))
+        notebook_style.configure("CustomNotebook.TNotebook", background=self.bg_color)
+        notebook_style.configure("CustomNotebook.TNotebook.Tab", background=self.bg_color, font=("Helvetica", 13))
 
-        # Configurar o novo estilo das abas
-        notebook_style.configure("CustomNotebook.TNotebook.Tab", font=("Helvetica", 13))
+        # Definir estilos para frames e labels
+        frame_style_name = 'Custom.TFrame'
+        notebook_style.configure(frame_style_name, background=self.bg_color)
+
+        notebook_style.configure("CustomBold.TLabel", font=("Helvetica", 12, "bold"), background=self.bg_color)
+        notebook_style.configure("CustomRegular.TLabel", font=("Helvetica", 12), background=self.bg_color)
 
         # Criar um Notebook (interface de abas) com estilo personalizado
         notebook = ttk.Notebook(self.details_frame, style="CustomNotebook.TNotebook")
@@ -504,23 +549,27 @@ class App:
 
         for section_name, fields in sections.items():
             # Criar um novo frame para a aba
-            tab_frame = ttk.Frame(notebook)
+            tab_frame = ttk.Frame(notebook, style=frame_style_name)
             notebook.add(tab_frame, text=section_name)
+
+            # Configurar as colunas
+            tab_frame.columnconfigure(0, weight=1, minsize=200)
+            tab_frame.columnconfigure(1, weight=3)
 
             row_idx = 0
             for col in fields:
                 if col in row_data:
-                    label = ttk.Label(tab_frame, text=f"{col}:", style="Bold.TLabel")
-                    label.grid(row=row_idx, column=0, sticky='w', padx=10, pady=5)
-                    value = ttk.Label(tab_frame, text=row_data[col], style="Regular.TLabel", wraplength=600, justify="left")
-                    value.grid(row=row_idx, column=1, sticky='w', padx=10, pady=5)
+                    label = ttk.Label(tab_frame, text=f"{col}:", style="CustomBold.TLabel", wraplength=200, justify='left')
+                    label.grid(row=row_idx, column=0, sticky='nw', padx=10, pady=5)
+                    value = ttk.Label(tab_frame, text=row_data[col], style="CustomRegular.TLabel", wraplength=600, justify="left")
+                    value.grid(row=row_idx, column=1, sticky='nw', padx=10, pady=5)
                     self.detail_widgets[col] = {'label': label, 'value': value, 'tab_frame': tab_frame}
                     row_idx += 1
 
             # Adicionar campos e botões específicos na aba "Informações Financeiras" se o status estiver vazio
             if section_name == "Informações Financeiras" and row_data['Status'] == '':
                 # Entry para "Valor (R$)"
-                value_label = ttk.Label(tab_frame, text="Valor (R$):", style="Bold.TLabel")
+                value_label = ttk.Label(tab_frame, text="Valor (R$):", style="CustomBold.TLabel")
                 value_label.grid(row=row_idx, column=0, sticky='w', padx=10, pady=5)
                 value_entry = ttk.Entry(tab_frame, width=50)
                 value_entry.grid(row=row_idx, column=1, sticky='w', padx=10, pady=5)
@@ -534,7 +583,7 @@ class App:
                     if not new_value.strip():
                         messagebox.showwarning("Aviso", "Por favor, insira um valor antes de autorizar o auxílio.")
                         return
-                    new_status = 'Aguardando documentação'  # Alterado aqui
+                    new_status = 'Aguardando documentação'
                     self.sheets_handler.update_status(row_data['Carimbo de data/hora'], new_status)
                     self.sheets_handler.update_value(row_data['Carimbo de data/hora'], new_value)
                     self.ask_send_email(row_data, new_status, new_value)
@@ -542,75 +591,108 @@ class App:
                     self.back_to_main_view()
 
                 def negar_auxilio():
-                    new_status = 'Negado'
-                    self.sheets_handler.update_status(row_data['Carimbo de data/hora'], new_status)
-                    self.ask_send_email(row_data, new_status)
-                    self.update_table()
-                    self.back_to_main_view()
+                    confirm = messagebox.askyesno("Confirmação", "Tem certeza que deseja recusar/cancelar o auxílio?")
+                    if confirm:
+                        new_status = 'Cancelado'
+                        self.sheets_handler.update_status(row_data['Carimbo de data/hora'], new_status)
+                        self.ask_send_email(row_data, new_status)
+                        self.update_table()
+                        self.back_to_main_view()
 
                 # Criar botões usando tk.Button
                 autorizar_button = tk.Button(tab_frame, text="Autorizar Auxílio", command=autorizar_auxilio,
                                              bg="green", fg="white", font=("Helvetica", 13))
-                negar_button = tk.Button(tab_frame, text="Negar Auxílio", command=negar_auxilio,
+                negar_button = tk.Button(tab_frame, text="Recusar/Cancelar Auxílio", command=negar_auxilio,
                                          bg="red", fg="white", font=("Helvetica", 13))
 
                 # Posicionar os botões abaixo do campo "Valor (R$)"
                 autorizar_button.grid(row=row_idx, column=0, padx=10, pady=10, sticky='w')
                 negar_button.grid(row=row_idx, column=1, padx=10, pady=10, sticky='w')
 
-        # Adicionar a aba "Ações" se estiver na visualização de Pendências
-        if self.current_view == "Pendências":
+        # Adicionar a aba "Ações" se estiver na visualização de Pendências ou Pronto para pagamento
+        if self.current_view in ["Pendências", "Pronto para pagamento"]:
             # Criar a aba "Ações"
-            actions_tab = ttk.Frame(notebook)
+            actions_tab = ttk.Frame(notebook, style=frame_style_name)
             notebook.add(actions_tab, text="Ações")
 
-            # Botão "Requerir Documentos"
-            def request_documents():
-                subject = "Requisição de Documentos"
-                body = f"Olá {row_data['Nome completo (sem abreviações):']},\n\n" \
-                       f"Precisamos que você envie os documentos X, Y e Z para prosseguirmos com sua solicitação.\n\n" \
-                       f"Atenciosamente,\nEquipe Financeira"
-                self.send_custom_email(row_data['Endereço de e-mail'], subject, body)
+            if self.current_view == "Pendências":
+                # Botão "Requerir Documentos"
+                def request_documents():
+                    subject = "Requisição de Documentos"
+                    body = f"Olá {row_data['Nome completo (sem abreviações):']},\n\n" \
+                           f"Precisamos que você envie os documentos necessários para prosseguirmos com sua solicitação.\n\n" \
+                           f"Atenciosamente,\nEquipe Financeira"
+                    self.send_custom_email(row_data['Endereço de e-mail'], subject, body)
 
-            request_button = tk.Button(actions_tab, text="Requerir Documentos", command=request_documents, bg="orange", fg="white", font=("Helvetica", 13))
-            request_button.pack(pady=10)
+                request_button = tk.Button(actions_tab, text="Requerir Documentos", command=request_documents, bg="orange", fg="white", font=("Helvetica", 13))
+                request_button.pack(pady=10)
 
-            # Botão "Autorizar Pagamento"
-            def authorize_payment():
-                new_status = 'Pronto para pagamento'
-                self.sheets_handler.update_status(row_data['Carimbo de data/hora'], new_status)
-                subject = "Pagamento Autorizado"
-                body = f"Olá {row_data['Nome completo (sem abreviações):']},\n\n" \
-                       f"Seu pagamento foi autorizado e está pronto para ser processado.\n\n" \
-                       f"Atenciosamente,\nEquipe Financeira"
-                self.send_custom_email(row_data['Endereço de e-mail'], subject, body)
-                # Atualizar tabela e voltar à visualização principal
-                self.update_table()
-                self.back_to_main_view()
+                # Botão "Autorizar Pagamento"
+                def authorize_payment():
+                    new_status = 'Pronto para pagamento'
+                    self.sheets_handler.update_status(row_data['Carimbo de data/hora'], new_status)
+                    subject = "Pagamento Autorizado"
+                    body = f"Olá {row_data['Nome completo (sem abreviações):']},\n\n" \
+                           f"Seu pagamento foi autorizado e está pronto para ser processado.\n\n" \
+                           f"Atenciosamente,\nEquipe Financeira"
+                    self.send_custom_email(row_data['Endereço de e-mail'], subject, body)
+                    # Atualizar tabela e voltar à visualização principal
+                    self.update_table()
+                    self.back_to_main_view()
 
-            authorize_button = tk.Button(actions_tab, text="Autorizar Pagamento", command=authorize_payment, bg="green", fg="white", font=("Helvetica", 13))
-            authorize_button.pack(pady=10)
+                authorize_button = tk.Button(actions_tab, text="Autorizar Pagamento", command=authorize_payment, bg="green", fg="white", font=("Helvetica", 13))
+                authorize_button.pack(pady=10)
 
-        elif self.current_view == "Pronto para pagamento":
-            # Criar a aba "Ações"
-            actions_tab = ttk.Frame(notebook)
-            notebook.add(actions_tab, text="Ações")
+                # Botão "Recusar/Cancelar Auxílio"
+                def cancel_auxilio():
+                    confirm = messagebox.askyesno("Confirmação", "Tem certeza que deseja recusar/cancelar o auxílio?")
+                    if confirm:
+                        new_status = 'Cancelado'
+                        self.sheets_handler.update_status(row_data['Carimbo de data/hora'], new_status)
+                        subject = "Auxílio Cancelado"
+                        body = f"Olá {row_data['Nome completo (sem abreviações):']},\n\n" \
+                               f"Seu auxílio foi cancelado.\n\n" \
+                               f"Atenciosamente,\nEquipe Financeira"
+                        self.send_custom_email(row_data['Endereço de e-mail'], subject, body)
+                        self.update_table()
+                        self.back_to_main_view()
 
-            # Botão "Pagamento Efetuado"
-            def payment_made():
-                new_status = 'Pago'
-                self.sheets_handler.update_status(row_data['Carimbo de data/hora'], new_status)
-                subject = "Pagamento Efetuado"
-                body = f"Olá {row_data['Nome completo (sem abreviações):']},\n\n" \
-                       f"Seu pagamento foi efetuado com sucesso.\n\n" \
-                       f"Atenciosamente,\nEquipe Financeira"
-                self.send_custom_email(row_data['Endereço de e-mail'], subject, body)
-                # Atualizar tabela e voltar à visualização principal
-                self.update_table()
-                self.back_to_main_view()
+                cancel_button = tk.Button(actions_tab, text="Recusar/Cancelar Auxílio", command=cancel_auxilio, bg="red", fg="white", font=("Helvetica", 13))
+                cancel_button.pack(pady=10)
 
-            payment_button = tk.Button(actions_tab, text="Pagamento Efetuado", command=payment_made, bg="green", fg="white", font=("Helvetica", 13))
-            payment_button.pack(pady=10)
+            elif self.current_view == "Pronto para pagamento":
+                # Botão "Pagamento Efetuado"
+                def payment_made():
+                    new_status = 'Pago'
+                    self.sheets_handler.update_status(row_data['Carimbo de data/hora'], new_status)
+                    subject = "Pagamento Efetuado"
+                    body = f"Olá {row_data['Nome completo (sem abreviações):']},\n\n" \
+                           f"Seu pagamento foi efetuado com sucesso.\n\n" \
+                           f"Atenciosamente,\nEquipe Financeira"
+                    self.send_custom_email(row_data['Endereço de e-mail'], subject, body)
+                    # Atualizar tabela e voltar à visualização principal
+                    self.update_table()
+                    self.back_to_main_view()
+
+                payment_button = tk.Button(actions_tab, text="Pagamento Efetuado", command=payment_made, bg="green", fg="white", font=("Helvetica", 13))
+                payment_button.pack(pady=10)
+
+                # Botão "Recusar/Cancelar Auxílio"
+                def cancel_auxilio():
+                    confirm = messagebox.askyesno("Confirmação", "Tem certeza que deseja recusar/cancelar o auxílio?")
+                    if confirm:
+                        new_status = 'Cancelado'
+                        self.sheets_handler.update_status(row_data['Carimbo de data/hora'], new_status)
+                        subject = "Auxílio Cancelado"
+                        body = f"Olá {row_data['Nome completo (sem abreviações):']},\n\n" \
+                               f"Seu auxílio foi cancelado.\n\n" \
+                               f"Atenciosamente,\nEquipe Financeira"
+                        self.send_custom_email(row_data['Endereço de e-mail'], subject, body)
+                        self.update_table()
+                        self.back_to_main_view()
+
+                cancel_button = tk.Button(actions_tab, text="Recusar/Cancelar Auxílio", command=cancel_auxilio, bg="red", fg="white", font=("Helvetica", 13))
+                cancel_button.pack(pady=10)
 
         # Exibir o botão "Voltar" no final da sessão de detalhes
         self.back_button.pack(side='bottom', pady=20)
