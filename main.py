@@ -9,9 +9,11 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from PIL import Image, ImageTk
 from datetime import datetime
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 # Carregar variável de ambiente para a senha do email
-os.environ['EMAIL_PASSWORD'] = 'senha'  # Substitua 'senha' pela sua senha real ou configure a variável de ambiente
+os.environ['EMAIL_PASSWORD'] = 'upxu mpbq mbce mdti'  # Substitua 'senha' pela sua senha real ou configure a variável de ambiente
 
 # Lista de colunas da planilha
 ALL_COLUMNS_detail = [
@@ -193,6 +195,10 @@ class App:
         self.view_all_button = tk.Button(self.left_frame, text="Visualização Completa", command=lambda: self.select_view("Todos"), bg=self.button_bg_color)
         self.view_all_button.pack(pady=10, padx=10, fill="x")
 
+        # Botão para 'Estatísticas'
+        self.statistics_button = tk.Button(self.left_frame, text="Estatísticas", command=self.show_statistics, bg=self.button_bg_color)
+        self.statistics_button.pack(pady=10, padx=10, fill="x")
+
         bottom_frame = tk.Frame(self.root, bg=self.bg_color)
         bottom_frame.pack(side="bottom", fill="x")
 
@@ -295,9 +301,19 @@ class App:
         if self.welcome_frame:
             self.welcome_frame.pack_forget()
 
+        # Ocultar o frame de estatísticas se estiver visível
+        if hasattr(self, 'statistics_frame') and self.statistics_frame.winfo_ismapped():
+            self.statistics_frame.pack_forget()
+
         # Certificar-se de que o table_frame está visível
         if not self.table_frame.winfo_ismapped():
             self.table_frame.pack(fill="both", expand=True)
+
+        # Ocultar detalhes se estiverem visíveis
+        if self.details_frame and self.details_frame.winfo_ismapped():
+            self.details_frame.pack_forget()
+            self.details_frame.destroy()
+            self.details_frame = None
 
         # Atualiza a tabela com o filtro selecionado
         if view_name == "Aguardando aprovação":
@@ -334,6 +350,8 @@ class App:
             self.selected_button = self.cancelled_button
         elif view_name == "Todos":
             self.selected_button = self.view_all_button
+        elif view_name == "Estatísticas":
+            self.selected_button = self.statistics_button
         else:
             self.selected_button = None
 
@@ -348,6 +366,8 @@ class App:
             self.details_frame.pack_forget()
             self.details_frame.destroy()
             self.details_frame = None
+        if hasattr(self, 'statistics_frame') and self.statistics_frame.winfo_ismapped():
+            self.statistics_frame.pack_forget()
         # Mostrar o welcome_frame
         self.welcome_frame.pack(fill="both", expand=True)
         # Resetar o botão selecionado
@@ -431,7 +451,7 @@ class App:
                 (self.data['Status'] != 'Pago') &
                 (self.data['Status'] != '') &
                 (self.data['Status'] != 'Cancelado') &
-                (self.data['Status'] != 'Negado') &
+                (self.data['Status'] != 'Negado')&
                 (self.data['Status'] != 'Pronto para pagamento')
             ]
         elif status_filter == "Vazio":
@@ -751,6 +771,97 @@ class App:
 
         send_button = tk.Button(email_window, text="Enviar E-mail", command=send_email)
         send_button.pack(pady=10)
+
+    def show_statistics(self):
+        # Ocultar outros frames
+        if self.welcome_frame.winfo_ismapped():
+            self.welcome_frame.pack_forget()
+        if self.table_frame.winfo_ismapped():
+            self.table_frame.pack_forget()
+        if self.details_frame and self.details_frame.winfo_ismapped():
+            self.details_frame.pack_forget()
+            self.details_frame.destroy()
+            self.details_frame = None
+
+        # Esconder o botão "Voltar" se estiver visível
+        if self.back_button.winfo_ismapped():
+            self.back_button.pack_forget()
+
+        # Atualizar o botão selecionado
+        self.update_selected_button("Estatísticas")
+
+        # Criar o frame de estatísticas
+        self.statistics_frame = tk.Frame(self.content_frame, bg=self.bg_color)
+        self.statistics_frame.pack(fill='both', expand=True)
+        self.display_statistics()
+
+    # ... (código anterior)
+
+    def display_statistics(self):
+        # Limpar o frame
+        for widget in self.statistics_frame.winfo_children():
+            widget.destroy()
+
+        # Recarregar os dados
+        self.data = self.sheets_handler.load_data()
+
+        # Converter 'Valor' para numérico
+        self.data['Valor'] = self.data['Valor'].astype(str).str.replace(',', '.').str.extract(r'(\d+\.?\d*)')[0]
+        self.data['Valor'] = pd.to_numeric(self.data['Valor'], errors='coerce').fillna(0)
+
+        total_requests = len(self.data)
+        pending_requests = len(self.data[
+            (self.data['Status'] != 'Pago') &
+            (self.data['Status'] != 'Pronto para pagamento') &
+            (self.data['Status'] != 'Cancelado') &
+            (self.data['Status'] != 'Negado') &
+            (self.data['Status'] != '')
+        ])
+        awaiting_payment_requests = len(self.data[self.data['Status'] == 'Pronto para pagamento'])
+        paid_requests = len(self.data[self.data['Status'] == 'Pago'])
+        total_paid_values = self.data[self.data['Status'] == 'Pago']['Valor'].sum()
+        total_released_values = self.data[
+            (self.data['Status'] == 'Pago') | (self.data['Status'] == 'Pronto para pagamento')
+        ]['Valor'].sum()
+
+        # Exibir as estatísticas
+        stats_text = f"""
+    Número total de solicitações: {total_requests}
+    Número de solicitações pendentes: {pending_requests}
+    Número de solicitações aguardando pagamento: {awaiting_payment_requests}
+    Número de solicitações pagas: {paid_requests}
+    Soma dos valores já pagos: R$ {total_paid_values:.2f}
+    Soma dos valores já liberados: R$ {total_released_values:.2f}
+    """
+
+        stats_label = tk.Label(self.statistics_frame, text=stats_text, font=("Helvetica", 12), bg=self.bg_color, justify='left')
+        stats_label.pack(pady=10, padx=10, anchor='w')
+
+        # Criar o gráfico
+        paid_data = self.data[self.data['Status'] == 'Pago'].copy()
+        if not paid_data.empty:
+            # Converter 'Ultima Atualizacao' para datetime
+            paid_data['Ultima Atualizacao'] = pd.to_datetime(paid_data['Ultima Atualizacao'], format='%d/%m/%Y %H:%M:%S', errors='coerce')
+            # Somar 'Valor' por data de 'Ultima Atualizacao'
+            paid_data = paid_data.dropna(subset=['Ultima Atualizacao'])
+            paid_data = paid_data.groupby(paid_data['Ultima Atualizacao'].dt.date)['Valor'].sum()
+
+            # Plotar os dados
+            fig = plt.Figure(figsize=(6, 4), dpi=100)
+            ax = fig.add_subplot(111)
+            paid_data.plot(kind='bar', ax=ax)
+            ax.set_title('Valores Pagos ao Longo do Tempo')
+            ax.set_xlabel('Data')
+            ax.set_ylabel('Valor Pago (R$)')
+            fig.tight_layout()
+
+            # Exibir o gráfico no Tkinter
+            canvas = FigureCanvasTkAgg(fig, master=self.statistics_frame)
+            canvas.draw()
+            canvas.get_tk_widget().pack(pady=10)
+        else:
+            no_data_label = tk.Label(self.statistics_frame, text="Nenhum pagamento realizado ainda.", font=("Helvetica", 12), bg=self.bg_color)
+            no_data_label.pack(pady=10)
 
 # Inicializar aplicação
 if __name__ == "__main__":
