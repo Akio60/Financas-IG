@@ -431,7 +431,8 @@ class App:
                 (self.data['Status'] != 'Pago') &
                 (self.data['Status'] != '') &
                 (self.data['Status'] != 'Cancelado') &
-                (self.data['Status'] != 'Negado')
+                (self.data['Status'] != 'Negado') &
+                (self.data['Status'] != 'Pronto para pagamento')
             ]
         elif status_filter == "Vazio":
             data_filtered = self.data[self.data['Status'] == '']
