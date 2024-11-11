@@ -135,14 +135,14 @@ class App:
         self.button_bg_color = '#add8e6'  # Botões azul
         self.frame_bg_color = '#d0e0ff'   # Frames azul claro
 
-        # Definir cores para os status
+        # Definir cores para os status com melhor contraste
         self.status_colors = {
-            'Aguardando documentação': '#FFD700',  # Dourado
-            'Autorizado': '#32CD32',               # Verde limão
-            'Negado': '#FF6347',                   # Tomate
-            'Pronto para pagamento': '#1E90FF',    # Azul Dodger
-            'Pago': '#8A2BE2',                     # Azul Violeta
-            'Cancelado': '#A9A9A9',                # Cinza Escuro
+            'Aguardando documentação': '#B8860B',  # DarkGoldenrod
+            'Autorizado': '#006400',               # DarkGreen
+            'Negado': '#8B0000',                   # DarkRed
+            'Pronto para pagamento': '#00008B',    # DarkBlue
+            'Pago': '#4B0082',                     # Indigo
+            'Cancelado': '#696969',                # DimGray
             # Adicione outros status se necessário
         }
 
@@ -431,8 +431,7 @@ class App:
                 (self.data['Status'] != 'Pago') &
                 (self.data['Status'] != '') &
                 (self.data['Status'] != 'Cancelado') &
-                (self.data['Status'] != 'Negado')&
-                (self.data['Status'] != 'Pronto para pagamento')
+                (self.data['Status'] != 'Negado')
             ]
         elif status_filter == "Vazio":
             data_filtered = self.data[self.data['Status'] == '']
@@ -460,17 +459,14 @@ class App:
             values = row.tolist()
             # Determinar a tag para cores alternadas
             tag = 'evenrow' if idx % 2 == 0 else 'oddrow'
-            # Inserir o item
-            self.tree.insert("", "end", iid=idx, values=values, tags=(tag,))
-            # Colorir o texto da célula 'Status' se existir
-            if 'Status' in self.columns_to_display:
-                status_index = self.columns_to_display.index('Status')
-                status_value = row['Status']
-                status_color = self.status_colors.get(status_value, '#000000')  # Cor padrão preta
-                item_id = self.tree.get_children()[-1]  # Último item inserido
-                # Alterar a cor do texto da célula 'Status'
-                self.tree.tag_configure(f'status_{idx}', foreground=status_color)
-                self.tree.item(item_id, tags=(tag, f'status_{idx}'))
+            # Obter a cor do status
+            status_value = row.get('Status', '')
+            status_color = self.status_colors.get(status_value, '#000000')  # Cor padrão preta
+
+            # Configurar uma tag específica para a cor do texto
+            self.tree.tag_configure(f'status_tag_{idx}', foreground=status_color)
+            # Inserir o item com a tag
+            self.tree.insert("", "end", iid=idx, values=values, tags=(tag, f'status_tag_{idx}'))
 
         # Esconde o botão de voltar quando na visualização principal
         self.back_button.pack_forget()
