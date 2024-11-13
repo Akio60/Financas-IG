@@ -292,8 +292,8 @@ class App:
     def setup_welcome_screen(self):
         # Carregar as imagens e redimensioná-las
         try:
-            img_ig = Image.open('logo_ig.png')
-            img_unicamp = Image.open('logo_unicamp.png')
+            img_ig = Image.open('logo_unicamp.png')
+            img_unicamp = Image.open('logo_ig.png')
 
             # Redimensionar as imagens para um tamanho adequado
             img_ig = img_ig.resize((100, 100), Image.LANCZOS)
