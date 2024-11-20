@@ -196,8 +196,8 @@ class App:
         title_label = tk.Label(self.left_frame, text="Lista de Status", font=("Helvetica", 14, "bold"), bg=self.frame_bg_color)
         title_label.pack(pady=20, padx=10)
 
-        # Botão Página Inicial
-        self.home_button = tk.Button(self.left_frame, text="🏠 Página Inicial", command=self.go_to_home, bg=self.button_bg_color)
+        # Botão Página Inicial (apenas símbolo de casa)
+        self.home_button = tk.Button(self.left_frame, text="🏠", command=self.go_to_home, bg=self.button_bg_color)
         self.home_button.pack(pady=10, padx=10, fill="x")
 
         # Botões de visualização
@@ -210,28 +210,27 @@ class App:
         self.ready_for_payment_button = tk.Button(self.left_frame, text="Solicitações pré efetuadas", command=lambda: self.select_view("Pronto para pagamento"), bg=self.button_bg_color)
         self.ready_for_payment_button.pack(pady=10, padx=10, fill="x")
 
-        # Botão para 'Visualização Completa'
-        self.view_all_button = tk.Button(self.left_frame, text="Histórico de solicitações", command=lambda: self.select_view("Todos"), bg=self.button_bg_color)
-        self.view_all_button.pack(pady=10, padx=10, fill="x")
+        # Frame para os botões inferiores
+        bottom_buttons_frame = tk.Frame(self.left_frame, bg=self.frame_bg_color)
+        bottom_buttons_frame.pack(side='bottom', fill='x', pady=10)
 
-        # Botão para 'Estatísticas'
-        self.statistics_button = tk.Button(self.left_frame, text="Estatísticas", command=self.show_statistics, bg=self.button_bg_color)
-        self.statistics_button.pack(pady=10, padx=10, fill="x")
+        # Botão Configurações (apenas símbolo de engrenagem)
+        self.settings_button = tk.Button(self.left_frame, text='⚙', command=self.open_settings, bg=self.button_bg_color)
+        self.settings_button.pack(side='bottom', pady=10, padx=10, fill='x')
 
-        # Barra de busca e botão 'Pesquisar'
-        search_label = tk.Label(self.left_frame, text="Pesquisar:", bg=self.frame_bg_color)
-        search_label.pack(pady=(10, 0), padx=10, anchor='w')
-
+        # Barra de busca e botão 'Pesquisar' (movidos para baixo)
         self.search_var = tk.StringVar()
         self.search_entry = tk.Entry(self.left_frame, textvariable=self.search_var, width=25)
         self.search_entry.pack(pady=5, padx=10)
 
         self.search_button = tk.Button(self.left_frame, text="Pesquisar", command=self.perform_search, bg=self.button_bg_color)
         self.search_button.pack(pady=5, padx=10, fill="x")
+        search_label = tk.Label(bottom_buttons_frame, text="Pesquisar:", bg=self.frame_bg_color)
 
         # Botão para 'Configurações'
         self.settings_button = tk.Button(self.left_frame, text="Configurações", command=self.open_settings, bg=self.button_bg_color)
         self.settings_button.pack(pady=10, padx=10, fill="x")
+        # Botão para 'Estatísticas' (movido para baixo)
 
         bottom_frame = tk.Frame(self.root, bg=self.bg_color)
         bottom_frame.pack(side="bottom", fill="x")
