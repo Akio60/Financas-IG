@@ -14,7 +14,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import json
 
 # Carregar variável de ambiente para a senha do email
-os.environ['EMAIL_PASSWORD'] = 'upxu mpbq mbce mdti'  # Substitua 'senha' pela sua senha real ou configure a variável de ambiente
+os.environ['EMAIL_PASSWORD'] = 'senha'  # Substitua 'senha' pela sua senha real ou configure a variável de ambiente
 
 # Lista de colunas da planilha
 ALL_COLUMNS_detail = [
@@ -220,17 +220,22 @@ class App:
 
         # Barra de busca e botão 'Pesquisar' (movidos para baixo)
         self.search_var = tk.StringVar()
-        self.search_entry = tk.Entry(self.left_frame, textvariable=self.search_var, width=25)
-        self.search_entry.pack(pady=5, padx=10)
+        self.search_button = tk.Button(bottom_buttons_frame, text="Pesquisar", command=self.perform_search, bg=self.button_bg_color)
+        self.search_button.pack(side='bottom', pady=5, padx=10, fill="x")
 
-        self.search_button = tk.Button(self.left_frame, text="Pesquisar", command=self.perform_search, bg=self.button_bg_color)
-        self.search_button.pack(pady=5, padx=10, fill="x")
+        self.search_entry = tk.Entry(bottom_buttons_frame, textvariable=self.search_var, width=25)
+        self.search_entry.pack(side='bottom', pady=5, padx=10)
+
         search_label = tk.Label(bottom_buttons_frame, text="Pesquisar:", bg=self.frame_bg_color)
+        search_label.pack(side='bottom', pady=(10, 0), padx=10, anchor='w')
 
-        # Botão para 'Configurações'
-        self.settings_button = tk.Button(self.left_frame, text="Configurações", command=self.open_settings, bg=self.button_bg_color)
-        self.settings_button.pack(pady=10, padx=10, fill="x")
         # Botão para 'Estatísticas' (movido para baixo)
+        self.statistics_button = tk.Button(bottom_buttons_frame, text="Estatísticas", command=self.show_statistics, bg=self.button_bg_color)
+        self.statistics_button.pack(side='bottom', pady=10, padx=10, fill="x")
+
+        # Botão para 'Histórico de solicitações' (movido para baixo)
+        self.view_all_button = tk.Button(bottom_buttons_frame, text="Histórico de solicitações", command=lambda: self.select_view("Todos"), bg=self.button_bg_color)
+        self.view_all_button.pack(side='bottom', pady=10, padx=10, fill="x")
 
         bottom_frame = tk.Frame(self.root, bg=self.bg_color)
         bottom_frame.pack(side="bottom", fill="x")
@@ -1123,8 +1128,7 @@ class App:
 
         save_button = tk.Button(template_window, text="Salvar", command=save_template, bg="green", fg="white")
         save_button.pack(pady=10)
-
-# Inicializar aplicação
+    # Inicializar aplicação
 if __name__ == "__main__":
     credentials_file = "credentials.json"
     sheet_url = "https://docs.google.com/spreadsheets/d/1sNwhkq0nCuTMRhs2HmahV88uIn9KiXY1ex0vlOwC0O8/edit?usp=sharing"
